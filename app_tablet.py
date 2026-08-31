@@ -223,10 +223,10 @@ with aba_qualidade_reatividade:
         st.markdown("### 📊 Histórico de Reatividade")
         st.dataframe(pd.read_excel("Log_Controle_Reatividade_DOC0001.xlsx"))
 
-# ABA 4: REGISTRO DE ANOMALIAS + ENVIO IMEDIATO DE E-MAIL SMTP (5W1H OPCIONAL)
+# ABA 4: REGISTRO DE ANOMALIAS + HORÁRIO AUTOMÁTICO + 5W1H OPCIONAL
 with aba_anomalias:
     st.subheader("⚠️ Registro de Anomalias & Abertura de Ocorrência")
-    st.markdown("Registre a não conformidade para envio imediato do alerta por e-mail ao responsável.")
+    st.markdown("Registre a não conformidade. O horário será capturado automaticamente pelo sistema.")
     
     agenda_emails = {
         "Rogério Grahl — Engenheiro Consultor": "Rograhl75@gmail.com",
@@ -243,7 +243,6 @@ with aba_anomalias:
         col_a1, col_a2 = st.columns(2)
         with col_a1:
             a_data = st.date_input("Data da Ocorrência", datetime.now())
-            a_hora = st.text_input("Horário da Ocorrência", datetime.now().strftime("%H:%M"))
             a_maquina = st.selectbox("Injetora / Máquina Afetada", df_base['Maquina'].unique().tolist())
         with col_a2:
             a_responsavel_cargo = st.selectbox("Direcionar para o Responsável:", list(agenda_emails.keys()))
@@ -273,9 +272,12 @@ with aba_anomalias:
             if not a_problema.strip():
                 st.warning("Por favor, descreva o problema antes de salvar a ocorrência.")
             else:
+                # Captura automática do horário exato do sistema no momento do clique
+                a_hora_sistema = datetime.now().strftime("%H:%M:%S")
+                
                 novo_reg_anom = {
                     "Data": a_data.strftime("%d/%m/%Y"),
-                    "Hora": a_hora,
+                    "Hora": a_hora_sistema,
                     "Máquina": a_maquina,
                     "Responsável": a_responsavel_cargo,
                     "E-mail Destino": a_email_destino,
@@ -300,7 +302,7 @@ with aba_anomalias:
                     smtp_server = "smtp.gmail.com"
                     smtp_port = 587
                     remetente_email = "Rograhl75@gmail.com"
-                    senha_app = "wrbf oqou loik cwkb"
+                    senha_app = "wrbf oqou loik cwkb" # <-- Insira sua senha de app de 16 letras aqui se desejar envio real
                     
                     msg = MIMEMultipart()
                     msg['From'] = remetente_email
@@ -312,7 +314,7 @@ with aba_anomalias:
                     
                     Uma nova ocorrência foi aberta no sistema ARIAM PU Control 4.0 e requer sua atenção:
                     
-                    - Data/Hora: {a_data.strftime('%d/%m/%Y')} às {a_hora}
+                    - Data/Hora: {a_data.strftime('%d/%m/%Y')} às {a_hora_sistema}
                     - Máquina Afetada: {a_maquina}
                     - Descrição do Problema: {a_problema}
                     
@@ -338,7 +340,7 @@ with aba_anomalias:
                     
                     st.success(f"Ocorrência salva e e-mail de alerta disparado com sucesso para **{a_email_destino}**!")
                 except Exception as ex:
-                    st.warning(f"Ocorrência salva com sucesso na planilha, mas houve falha no envio do e-mail: {ex}")
+                    st.warning(f"Ocorrência salva com sucesso na planilha (Horário: {a_hora_sistema}), mas houve falha no envio do e-mail: {ex}")
 
     if os.path.exists("Log_Registro_Anomalias.xlsx"):
         st.markdown("---")
