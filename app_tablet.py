@@ -54,11 +54,22 @@ except Exception as e:
     st.error(f"Erro ao ler a planilha de dados: {e}")
     st.stop()
 
-# Ajuste de tratamento das colunas de texto para garantir filtros limpos
-df_base['Expositor'] = df_base['Expositor'].fillna("GERAL").astype(str) if 'Expositor' in df_base.columns else "GERAL"
+# Garantir os nomes exatos das colunas conforme o recorte da planilha
+colunas_necessarias = ['Maquina', 'Expositor', 'Componente', 'Codigo_Item', 'Descricao']
+for col in colunas_necessarias:
+    if col not in df_base.columns:
+        if col == 'Codigo_Item' and 'Item' in df_base.columns:
+            df_base['Codigo_Item'] = df_base['Item']
+        else:
+            df_base[col] = "GERAL"
+
+df_base['Expositor'] = df_base['Expositor'].fillna("GERAL").astype(str)
 df_base['Componente'] = df_base['Componente'].fillna("GERAL").astype(str)
 df_base['Codigo_Item'] = df_base['Codigo_Item'].astype(str)
 df_base['Descricao'] = df_base['Descricao'].astype(str)
+
+# Criação da coluna concatenada para o filtro unificado de Item / Descrição
+df_base['Item_Descricao'] = df_base['Codigo_Item'] + " — " + df_base['Descricao']
 
 aba_producao, aba_qualidade_pesagem, aba_qualidade_reatividade, aba_anomalias = st.tabs([
     "⚙️ Painel de Produção & Máquinas", 
@@ -68,7 +79,7 @@ aba_producao, aba_qualidade_pesagem, aba_qualidade_reatividade, aba_anomalias = 
 ])
 
 with aba_producao:
-    st.subheader("📦 Pesquisa Avançada (Injetora ➔ Expositor ➔ Componente ➔ Item)")
+    st.subheader("📦 Pesquisa Avançada (Injetora ➔ Expositor ➔ Componente ➔ Item / Descrição)")
     
     col_f1, col_f2, col_f3, col_f4 = st.columns(4)
     
@@ -81,10 +92,10 @@ with aba_producao:
         df_f = df_f[df_f['Maquina'] == filtro_maq]
         
     with col_f2:
-        exp_opcoes = ["Todos"] + df_f['Expositor'].unique().tolist() if 'Expositor' in df_f.columns else ["Todos"]
+        exp_opcoes = ["Todos"] + df_f['Expositor'].unique().tolist()
         filtro_exp = st.selectbox("2️⃣ Expositor:", exp_opcoes)
         
-    if filtro_exp != "Todos" and 'Expositor' in df_f.columns:
+    if filtro_exp != "Todos":
         df_f = df_f[df_f['Expositor'] == filtro_exp]
         
     with col_f3:
@@ -95,21 +106,18 @@ with aba_producao:
         df_f = df_f[df_f['Componente'] == filtro_comp]
         
     with col_f4:
-        item_opcoes = ["Todos"] + df_f['Codigo_Item'].unique().tolist()
-        filtro_item = st.selectbox("4️⃣ Código do Item:", item_opcoes)
+        item_desc_opcoes = ["Todos"] + df_f['Item_Descricao'].unique().tolist()
+        filtro_item_desc = st.selectbox("4️⃣ Item / Descrição:", item_desc_opcoes)
         
-    if filtro_item != "Todos":
-        df_f = df_f[df_f['Codigo_Item'] == filtro_item]
+    if filtro_item_desc != "Todos":
+        df_f = df_f[df_f['Item_Descricao'] == filtro_item_desc]
         
     if len(df_f) == 0:
         st.warning("Nenhum item encontrado com os filtros selecionados.")
         st.stop()
         
-    opcoes_finais = df_f.apply(lambda row: f"Item {row['Codigo_Item']} — {row['Descricao']} (Comp: {row['Componente']} | Máq: {row['Maquina']})", axis=1).tolist()
-    escolha_final = st.selectbox("🎯 Selecione o item correspondente na lista filtrada:", opcoes_finais)
-    
-    idx_sel = opcoes_finais.index(escolha_final)
-    dados_p = df_f.iloc[idx_sel]
+    # Como o filtro 4 já restringe o item de forma única ou direta, pegamos o primeiro registro filtrado
+    dados_p = df_f.iloc[0]
     
     st.markdown("---")
 
@@ -117,7 +125,7 @@ with aba_producao:
     
     with col_info1:
         st.markdown(f"### ⚙️ Alvo no CLP — {dados_p['Maquina']}")
-        st.info(f"**Expositor:** {dados_p.get('Expositor', 'N/A')} | **Componente:** {dados_p['Componente']}\n\n**Item:** {dados_p['Codigo_Item']} — {dados_p['Descricao']}")
+        st.info(f"**Expositor:** {dados_p['Expositor']} | **Componente:** {dados_p['Componente']}\n\n**Item / Descrição:** {dados_p['Item_Descricao']}")
         st.write(f"**Volume do Molde:** {dados_p['Volume']} m³")
         st.write(f"**Condição Climática Ativa:** {dados_p['Condicao_Climatica']}")
         
