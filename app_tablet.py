@@ -2,7 +2,7 @@ import os
 import streamlit as st
 import pandas as pd
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -79,7 +79,6 @@ aba_producao, aba_qualidade_pesagem, aba_qualidade_reatividade, aba_anomalias = 
 with aba_producao:
     st.subheader("📦 Pesquisa Avançada")
     
-    # Linha 1: Injetora e Expositor
     col_l1_c1, col_l1_c2 = st.columns(2)
     with col_l1_c1:
         maq_opcoes = ["Todas"] + df_base['Maquina_Filtro'].unique().tolist()
@@ -96,7 +95,6 @@ with aba_producao:
     if filtro_exp != "Todos":
         df_f = df_f[df_f['Expositor_Filtro'] == filtro_exp]
 
-    # Linha 2: Componente e Item / Descrição
     col_l2_c1, col_l2_c2 = st.columns(2)
     with col_l2_c1:
         comp_opcoes = ["Todos"] + df_f['Componente_Filtro'].unique().tolist()
@@ -232,12 +230,11 @@ with aba_qualidade_reatividade:
         st.markdown("### 📊 Histórico de Reatividade")
         st.dataframe(pd.read_excel("Log_Controle_Reatividade_DOC0001.xlsx"))
 
-# ABA 4: REGISTRO DE ANOMALIAS + CADASTRO DE E-MAILS CLARO
+# ABA 4: REGISTRO DE ANOMALIAS + HORÁRIO AJUSTADO PARA BRASÍLIA (BRT / UTC-3)
 with aba_anomalias:
     st.subheader("⚠️ Registro de Anomalias & Abertura de Ocorrência")
-    st.markdown("Registre a não conformidade. O e-mail será disparado automaticamente para o responsável selecionado.")
+    st.markdown("Registre a não conformidade. O horário será capturado automaticamente pelo horário de Brasília.")
     
-    # LISTA CENTRALIZADA DE RESPONSÁVEIS E E-MAILS
     agenda_emails = {
         "Rogério Grahl (Engenheiro Consultor) — Rograhl75@gmail.com": "Rograhl75@gmail.com",
         "Pedro Mantovani (Gerente Slitter) — pedro.mantovani@fastgondolas.com.br": "pedro.mantovani@fastgondolas.com.br",
@@ -252,12 +249,14 @@ with aba_anomalias:
         st.markdown("### 1️⃣ Dados da Ocorrência")
         col_a1, col_a2 = st.columns(2)
         with col_a1:
-            a_data = st.date_input("Data da Ocorrência", datetime.now())
+            # Fuso horário de Brasília (UTC-3)
+            fuso_br = timezone(timedelta(hours=-3))
+            data_atual_br = datetime.now(fuso_br).date()
+            a_data = st.date_input("Data da Ocorrência", data_atual_br)
             a_maquina = st.selectbox("Injetora / Máquina Afetada", df_base['Maquina_Filtro'].unique().tolist())
         with col_a2:
             resp_selecionado = st.selectbox("Direcionar para o Responsável:", list(agenda_emails.keys()))
             a_email_destino = agenda_emails[resp_selecionado]
-            # Extrai apenas o nome legível para o log e e-mail
             a_responsavel_cargo = resp_selecionado.split(" — ")[0]
             
         a_problema = st.text_area("Descrição do Problema Detectado (Ocorrência):", placeholder="Ex: Desvio de densidade acima do limite superior...")
@@ -283,7 +282,9 @@ with aba_anomalias:
             if not a_problema.strip():
                 st.warning("Por favor, descreva o problema antes de salvar a ocorrência.")
             else:
-                a_hora_sistema = datetime.now().strftime("%H:%M:%S")
+                # Captura o horário exato ajustado para Brasília (UTC-3)
+                fuso_br = timezone(timedelta(hours=-3))
+                a_hora_sistema = datetime.now(fuso_br).strftime("%H:%M:%S")
                 
                 novo_reg_anom = {
                     "Data": a_data.strftime("%d/%m/%Y"),
