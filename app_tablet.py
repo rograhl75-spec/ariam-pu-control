@@ -54,31 +54,44 @@ except Exception as e:
     st.error(f"Erro ao ler a planilha de dados: {e}")
     st.stop()
 
-# Limpeza e normalização dos nomes das colunas da planilha para evitar conflitos de maiúsculas/espaços
-df_base.columns = [str(c).strip() for c in df_base.columns]
+# MAPEAMENTO EXATO PELAS COLUNAS FÍSICAS DA PLANILHA:
+# Coluna B (índice 1): Expositor
+# Coluna C (índice 2): Componente
+# Coluna D (índice 3): Item
+# Coluna E (índice 4): Descrição
+# Coluna F (índice 5): Cabeçote (1 = Krauss Maffei 40/40 | 2 = Krauss Maffei 80/80)
+colunas_lista = df_base.columns.tolist()
 
-# MAPEAMENTO EXATO BASEADO NA ESTRUTURA DA PLANILHA:
-# Identifica a Máquina/Injetora
-col_maq_alvo = next((c for c in df_base.columns if 'maq' in c.lower() or 'injetora' in c.lower()), df_base.columns[0])
+idx_exp = 1 if len(colunas_lista) > 1 else 0
+idx_comp = 2 if len(colunas_lista) > 2 else 0
+idx_item = 3 if len(colunas_lista) > 3 else 0
+idx_desc = 4 if len(colunas_lista) > 4 else 0
+idx_cab = 5 if len(colunas_lista) > 5 else 0
 
-# Identifica Expositor (Coluna B da planilha)
-col_exp_alvo = next((c for c in df_base.columns if 'expositor' in c.lower() or 'modelo' in c.lower()), 'Expositor')
+# Atribuição dos valores brutos
+df_base['Expositor_Filtro'] = df_base.iloc[:, idx_exp].fillna("GERAL").astype(str).str.strip()
+df_base['Componente_Filtro'] = df_base.iloc[:, idx_comp].fillna("GERAL").astype(str).str.strip()
+df_base['Item_Filtro'] = df_base.iloc[:, idx_item].fillna("0000").astype(str).str.strip()
+df_base['Descricao_Filtro'] = df_base.iloc[:, idx_desc].fillna("").astype(str).str.strip()
 
-# Identifica Componente (Coluna C da planilha)
-col_comp_alvo = next((c for c in df_base.columns if 'componente' in c.lower()), 'Componente')
+# Leitura da coluna de Cabeçote (Coluna F) e tradução para o nome da Injetora
+def traduzir_cabecote(val):
+    val_str = str(val).strip()
+    if "1" in val_str:
+        return "Krauss Maffei 40/40"
+    elif "2" in val_str:
+        return "Krauss Maffei 80/80"
+    else:
+        # Se a planilha já trouxer o nome da máquina ou outro valor, preserva
+        return val_str if val_str and val_str != "nan" else "Krauss Maffei 40/40"
 
-# Identifica Item (Coluna D da planilha)
-col_item_alvo = next((c for c in df_base.columns if c.lower() in ['item', 'código do item', 'codigo_item', 'codigo']), 'Item')
-
-# Identifica Descrição (Coluna E da planilha)
-col_desc_alvo = next((c for c in df_base.columns if 'descri' in c.lower()), 'Descrição')
-
-# Atribuição blindada ao DataFrame do app
-df_base['Maquina_Filtro'] = df_base[col_maq_alvo].fillna("GERAL").astype(str).str.strip()
-df_base['Expositor_Filtro'] = df_base[col_exp_alvo].fillna("GERAL").astype(str).str.strip()
-df_base['Componente_Filtro'] = df_base[col_comp_alvo].fillna("GERAL").astype(str).str.strip()
-df_base['Item_Filtro'] = df_base[col_item_alvo].fillna("0000").astype(str).str.strip()
-df_base['Descricao_Filtro'] = df_base[col_desc_alvo].fillna("").astype(str).str.strip()
+# Caso a planilha já possua uma coluna explícita de Máquina, podemos usá-la, senão derivamos do cabeçote da Coluna F
+if 'Maquina' in df_base.columns:
+    df_base['Maquina_Filtro'] = df_base['Maquina'].fillna("").astype(str).str.strip()
+    # Se estiver vazia ou genérica, usa a conversão da coluna F
+    df_base['Maquina_Filtro'] = df_base['Maquina_Filtro'].apply(lambda x: traduzir_cabecote(x) if x in ["", "nan", "1", "2"] else x)
+else:
+    df_base['Maquina_Filtro'] = df_base.iloc[:, idx_cab].apply(traduzir_cabecote)
 
 # Concatenado de Item e Descrição (Colunas D e E)
 df_base['Item_Descricao_Completo'] = df_base['Item_Filtro'] + " — " + df_base['Descricao_Filtro']
@@ -94,11 +107,11 @@ with aba_producao:
     st.subheader("📦 Pesquisa Avançada")
     
     # ORGANIZADO EM DUAS LINHAS PARA PERFEITA VISIBILIDADE EM CAMPO
-    # Linha 1: Injetora (Máquina) e Expositor (Coluna B)
+    # Linha 1: Injetora (Derivada do Cabeçote da Coluna F) e Expositor (Coluna B)
     col_l1_c1, col_l1_c2 = st.columns(2)
     with col_l1_c1:
         maq_opcoes = ["Todas"] + df_base['Maquina_Filtro'].unique().tolist()
-        filtro_maq = st.selectbox("1️⃣ Injetora (Máquina):", maq_opcoes)
+        filtro_maq = st.selectbox("1️⃣ Injetora (Via Cabeçote Coluna F):", maq_opcoes)
         
     df_f = df_base.copy()
     if filtro_maq != "Todas":
