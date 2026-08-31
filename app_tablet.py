@@ -54,12 +54,12 @@ except Exception as e:
     st.error(f"Erro ao ler a planilha de dados: {e}")
     st.stop()
 
-# MAPEAMENTO EXATO PELAS COLUNAS FÍSICAS DA PLANILHA:
-# Coluna B (índice 1): Expositor
-# Coluna C (índice 2): Componente
-# Coluna D (índice 3): Item
-# Coluna E (índice 4): Descrição
-# Coluna F (índice 5): Cabeçote (1 = Krauss Maffei 40/40 | 2 = Krauss Maffei 80/80)
+# MAPEAMENTO RIGOROSO DAS POSIÇÕES FÍSICAS REAIS DA SUA PLANILHA:
+# Índice 1 (Coluna B): Expositor
+# Índice 2 (Coluna C): Componente
+# Índice 3 (Coluna D): Item
+# Índice 4 (Coluna E): Descrição
+# Índice 5 (Coluna F): Cabeçote (1 = Krauss Maffei 40/40 | 2 = Krauss Maffei 80/80)
 colunas_lista = df_base.columns.tolist()
 
 idx_exp = 1 if len(colunas_lista) > 1 else 0
@@ -68,13 +68,13 @@ idx_item = 3 if len(colunas_lista) > 3 else 0
 idx_desc = 4 if len(colunas_lista) > 4 else 0
 idx_cab = 5 if len(colunas_lista) > 5 else 0
 
-# Atribuição dos valores brutos
+# Atribuição estrita baseada na posição física exata das colunas
 df_base['Expositor_Filtro'] = df_base.iloc[:, idx_exp].fillna("GERAL").astype(str).str.strip()
 df_base['Componente_Filtro'] = df_base.iloc[:, idx_comp].fillna("GERAL").astype(str).str.strip()
 df_base['Item_Filtro'] = df_base.iloc[:, idx_item].fillna("0000").astype(str).str.strip()
 df_base['Descricao_Filtro'] = df_base.iloc[:, idx_desc].fillna("").astype(str).str.strip()
 
-# Leitura da coluna de Cabeçote (Coluna F) e tradução para o nome da Injetora
+# Tradução do Cabeçote (Coluna F) para o nome da Máquina
 def traduzir_cabecote(val):
     val_str = str(val).strip()
     if "1" in val_str:
@@ -82,13 +82,10 @@ def traduzir_cabecote(val):
     elif "2" in val_str:
         return "Krauss Maffei 80/80"
     else:
-        # Se a planilha já trouxer o nome da máquina ou outro valor, preserva
         return val_str if val_str and val_str != "nan" else "Krauss Maffei 40/40"
 
-# Caso a planilha já possua uma coluna explícita de Máquina, podemos usá-la, senão derivamos do cabeçote da Coluna F
 if 'Maquina' in df_base.columns:
     df_base['Maquina_Filtro'] = df_base['Maquina'].fillna("").astype(str).str.strip()
-    # Se estiver vazia ou genérica, usa a conversão da coluna F
     df_base['Maquina_Filtro'] = df_base['Maquina_Filtro'].apply(lambda x: traduzir_cabecote(x) if x in ["", "nan", "1", "2"] else x)
 else:
     df_base['Maquina_Filtro'] = df_base.iloc[:, idx_cab].apply(traduzir_cabecote)
@@ -106,12 +103,12 @@ aba_producao, aba_qualidade_pesagem, aba_qualidade_reatividade, aba_anomalias = 
 with aba_producao:
     st.subheader("📦 Pesquisa Avançada")
     
-    # ORGANIZADO EM DUAS LINHAS PARA PERFEITA VISIBILIDADE EM CAMPO
-    # Linha 1: Injetora (Derivada do Cabeçote da Coluna F) e Expositor (Coluna B)
+    # ORGANIZADO EM DUAS LINHAS SEM INDICAÇÕES DE COLUNAS
+    # Linha 1: Injetora e Expositor
     col_l1_c1, col_l1_c2 = st.columns(2)
     with col_l1_c1:
         maq_opcoes = ["Todas"] + df_base['Maquina_Filtro'].unique().tolist()
-        filtro_maq = st.selectbox("1️⃣ Injetora (Via Cabeçote Coluna F):", maq_opcoes)
+        filtro_maq = st.selectbox("Injetora:", maq_opcoes)
         
     df_f = df_base.copy()
     if filtro_maq != "Todas":
@@ -119,23 +116,23 @@ with aba_producao:
         
     with col_l1_c2:
         exp_opcoes = ["Todos"] + df_f['Expositor_Filtro'].unique().tolist()
-        filtro_exp = st.selectbox("2️⃣ Expositor (Coluna B):", exp_opcoes)
+        filtro_exp = st.selectbox("Expositor:", exp_opcoes)
         
     if filtro_exp != "Todos":
         df_f = df_f[df_f['Expositor_Filtro'] == filtro_exp]
 
-    # Linha 2: Componente (Coluna C) e Item / Descrição (Colunas D e E)
+    # Linha 2: Componente e Item / Descrição
     col_l2_c1, col_l2_c2 = st.columns(2)
     with col_l2_c1:
         comp_opcoes = ["Todos"] + df_f['Componente_Filtro'].unique().tolist()
-        filtro_comp = st.selectbox("3️⃣ Componente (Coluna C):", comp_opcoes)
+        filtro_comp = st.selectbox("Componente:", comp_opcoes)
         
     if filtro_comp != "Todos":
         df_f = df_f[df_f['Componente_Filtro'] == filtro_comp]
         
     with col_l2_c2:
         item_desc_opcoes = ["Todos"] + df_f['Item_Descricao_Completo'].unique().tolist()
-        filtro_item_desc = st.selectbox("4️⃣ Item / Descrição (Colunas D & E):", item_desc_opcoes)
+        filtro_item_desc = st.selectbox("Item / Descrição:", item_desc_opcoes)
         
     if filtro_item_desc != "Todos":
         df_f = df_f[df_f['Item_Descricao_Completo'] == filtro_item_desc]
