@@ -51,28 +51,29 @@ st.sidebar.markdown(f"**Status Térmico:** {cond_clima}")
 try:
     df_base = pd.read_excel("Relatorio_Processo_Injecao_Atualizado.xlsx")
 except Exception as e:
-    st.error(f"Erro ao ler a planilha de dados: {e}")
+    st.error(f"Error ao ler a planilha de dados: {e}")
     st.stop()
 
-# MAPEAMENTO EXATO DAS COLUNAS DA PLANILHA DE ENGENHARIA:
-# Coluna B: Expositor | Coluna C: Componente | Coluna D: Item | Coluna E: Descricao
-# Tratativa para garantir que os nomes das colunas capturem corretamente do Excel
-colunas_existentes = [c.strip() for c in df_base.columns]
+# MAPEAMENTO POR POSIÇÃO EXATA DAS COLUNAS DA PLANILHA DE ENGENHARIA:
+# Coluna A (índice 0): Maquina
+# Coluna B (índice 1): Expositor
+# Coluna C (índice 2): Componente
+# Coluna D (índice 3): Item (Código)
+# Coluna E (índice 4): Descrição
+colunas_por_posicao = df_base.columns.tolist()
 
-# Identifica Expositor (Coluna B)
-col_exp = next((c for c in df_base.columns if 'expositor' in str(c).lower() or 'modelo' in str(c).lower()), 'Expositor')
-# Identifica Componente (Coluna C)
-col_comp = next((c for c in df_base.columns if 'componente' in str(c).lower()), 'Componente')
-# Identifica Item (Coluna D)
-col_item = next((c for c in df_base.columns if 'item' in str(c).lower() or 'codigo' in str(c).lower()), 'Codigo_Item')
-# Identifica Descricao (Coluna E)
-col_desc = next((c for c in df_base.columns if 'descri' in str(c).lower()), 'Descricao')
+nome_col_maq = colunas_por_posicao[0] if len(colunas_por_posicao) > 0 else 'Maquina'
+nome_col_exp = colunas_por_posicao[1] if len(colunas_por_posicao) > 1 else 'Expositor'
+nome_col_comp = colunas_por_posicao[2] if len(colunas_por_posicao) > 2 else 'Componente'
+nome_col_item = colunas_por_posicao[3] if len(colunas_por_posicao) > 3 else 'Codigo_Item'
+nome_col_desc = colunas_por_posicao[4] if len(colunas_por_posicao) > 4 else 'Descricao'
 
-# Atribui e padroniza no DataFrame de forma garantida
-df_base['Expositor_Real'] = df_base[col_exp].fillna("GERAL").astype(str).str.strip()
-df_base['Componente_Real'] = df_base[col_comp].fillna("GERAL").astype(str).str.strip()
-df_base['Codigo_Item_Real'] = df_base[col_item].fillna("0000").astype(str).str.strip()
-df_base['Descricao_Real'] = df_base[col_desc].fillna("").astype(str).str.strip()
+# Atribuição segura com base nas colunas físicas reais
+df_base['Maquina_Real'] = df_base[nome_col_maq].fillna("GERAL").astype(str).str.strip()
+df_base['Expositor_Real'] = df_base[nome_col_exp].fillna("GERAL").astype(str).str.strip()
+df_base['Componente_Real'] = df_base[nome_col_comp].fillna("GERAL").astype(str).str.strip()
+df_base['Codigo_Item_Real'] = df_base[nome_col_item].fillna("0000").astype(str).str.strip()
+df_base['Descricao_Real'] = df_base[nome_col_desc].fillna("").astype(str).str.strip()
 
 # Colunas D e E concatenadas para o item/descrição
 df_base['Item_Descricao'] = df_base['Codigo_Item_Real'] + " — " + df_base['Descricao_Real']
@@ -87,16 +88,16 @@ aba_producao, aba_qualidade_pesagem, aba_qualidade_reatividade, aba_anomalias = 
 with aba_producao:
     st.subheader("📦 Pesquisa Avançada")
     
-    # ORGANIZADO EM DUAS LINHAS PARA VISIBILIDADE COMPLETA DO TEXTO
+    # ORGANIZADO EM DUAS LINHAS PARA VISIBILIDADE COMPLETA DO TEXTO EM CAMPO
     # Linha 1: Injetora e Expositor (Coluna B)
     col_l1_c1, col_l1_c2 = st.columns(2)
     with col_l1_c1:
-        maq_opcoes = ["Todas"] + df_base['Maquina'].unique().tolist()
+        maq_opcoes = ["Todas"] + df_base['Maquina_Real'].unique().tolist()
         filtro_maq = st.selectbox("1️⃣ Injetora (Máquina):", maq_opcoes)
         
     df_f = df_base.copy()
     if filtro_maq != "Todas":
-        df_f = df_f[df_f['Maquina'] == filtro_maq]
+        df_f = df_f[df_f['Maquina_Real'] == filtro_maq]
         
     with col_l1_c2:
         exp_opcoes = ["Todos"] + df_f['Expositor_Real'].unique().tolist()
@@ -132,7 +133,7 @@ with aba_producao:
     col_info1, col_info2 = st.columns(2)
     
     with col_info1:
-        st.markdown(f"### ⚙️ Alvo no CLP — {dados_p['Maquina']}")
+        st.markdown(f"### ⚙️ Alvo no CLP — {dados_p['Maquina_Real']}")
         st.info(f"**Expositor:** {dados_p['Expositor_Real']} | **Componente:** {dados_p['Componente_Real']}\n\n**Item / Descrição:** {dados_p['Item_Descricao']}")
         st.write(f"**Volume do Molde:** {dados_p['Volume']} m³")
         st.write(f"**Condição Climática Ativa:** {dados_p['Condicao_Climatica']}")
@@ -143,7 +144,7 @@ with aba_producao:
     with col_info2:
         st.markdown("### 🛠️ Especificações de Processo & Densidades")
         st.markdown(f"""
-        * **Injetora:** {dados_p['Maquina']}
+        * **Injetora:** {dados_p['Maquina_Real']}
         * **Vazão Calibrada:** {dados_p['Vazao_Cabecote_g_s']} g/s
         * **Pressão de Injeção Alvo:** {dados_p['Pressao_Injecao']}
         * **Relação I/P (Iso/Poliol):** {dados_p['Relacao_Iso_Pol']}
@@ -261,7 +262,7 @@ with aba_anomalias:
         col_a1, col_a2 = st.columns(2)
         with col_a1:
             a_data = st.date_input("Data da Ocorrência", datetime.now())
-            a_maquina = st.selectbox("Injetora / Máquina Afetada", df_base['Maquina'].unique().tolist())
+            a_maquina = st.selectbox("Injetora / Máquina Afetada", df_base['Maquina_Real'].unique().tolist())
         with col_a2:
             a_responsavel_cargo = st.selectbox("Direcionar para o Responsável:", list(agenda_emails.keys()))
             a_email_destino = agenda_emails[a_responsavel_cargo]
