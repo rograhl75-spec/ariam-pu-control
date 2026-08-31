@@ -54,31 +54,29 @@ except Exception as e:
     st.error(f"Erro ao ler a planilha de dados: {e}")
     st.stop()
 
-# Limpeza e normalização dos nomes das colunas da planilha
+# Normalizar cabeçalhos removendo espaços extras
 df_base.columns = [str(c).strip() for c in df_base.columns]
 
-# MAPEAMENTO EXATO PELOS NOMES DOS CABEÇALHOS DA PLANILHA:
-# Expositor, Componente, Item, Descrição, Cabeçote
-def buscar_coluna(df, possiveis_nomes):
-    for col in df.columns:
-        for nome in possiveis_nomes:
-            if nome.lower() in col.lower():
-                return col
-    return None
+# MAPEAMENTO DIRETO E EXATO PELOS NOMES DOS CABEÇALHOS DA PLANILHA:
+# Coluna B: Expositor
+# Coluna C: Componente
+# Coluna D: Item
+# Coluna E: Descrição
+# Coluna F: Cabeçote
 
-col_exp = buscar_coluna(df_base, ['expositor'])
-col_comp = buscar_coluna(df_base, ['componente'])
-col_item = buscar_coluna(df_base, ['item'])
-col_desc = buscar_coluna(df_base, ['descri'])
-col_cab = buscar_coluna(df_base, ['cabeçote', 'cabecote'])
+col_exp = 'Expositor' if 'Expositor' in df_base.columns else df_base.columns[1]
+col_comp = 'Componente' if 'Componente' in df_base.columns else df_base.columns[2]
+col_item = 'Item' if 'Item' in df_base.columns else df_base.columns[3]
+col_desc = 'Descrição' if 'Descrição' in df_base.columns else ('Descricao' if 'Descricao' in df_base.columns else df_base.columns[4])
+col_cab = 'Cabeçote' if 'Cabeçote' in df_base.columns else ('Cabecote' if 'Cabecote' in df_base.columns else df_base.columns[5])
 
-# Atribuição segura com base estrita nos nomes reais das colunas
-df_base['Expositor_Filtro'] = df_base[col_exp].fillna("GERAL").astype(str).str.strip() if col_exp else "GERAL"
-df_base['Componente_Filtro'] = df_base[col_comp].fillna("GERAL").astype(str).str.strip() if col_comp else "GERAL"
-df_base['Item_Filtro'] = df_base[col_item].fillna("0000").astype(str).str.strip() if col_item else "0000"
-df_base['Descricao_Filtro'] = df_base[col_desc].fillna("").astype(str).str.strip() if col_desc else ""
+# Atribuição rigorosa aos filtros
+df_base['Expositor_Filtro'] = df_base[col_exp].fillna("").astype(str).str.strip()
+df_base['Componente_Filtro'] = df_base[col_comp].fillna("").astype(str).str.strip()
+df_base['Item_Filtro'] = df_base[col_item].fillna("").astype(str).str.strip()
+df_base['Descricao_Filtro'] = df_base[col_desc].fillna("").astype(str).str.strip()
 
-# Tradução do Cabeçote para o nome da Máquina
+# Tradução do Cabeçote (Coluna F) para a Máquina
 def traduzir_cabecote(val):
     val_str = str(val).strip()
     if "1" in val_str:
@@ -88,12 +86,9 @@ def traduzir_cabecote(val):
     else:
         return val_str if val_str and val_str != "nan" else "Krauss Maffei 40/40"
 
-if col_cab:
-    df_base['Maquina_Filtro'] = df_base[col_cab].apply(traduzir_cabecote)
-else:
-    df_base['Maquina_Filtro'] = "Krauss Maffei 40/40"
+df_base['Maquina_Filtro'] = df_base[col_cab].apply(traduzir_cabecote)
 
-# Concatenado de Item e Descrição
+# Concatenado de Item e Descrição (Colunas D e E)
 df_base['Item_Descricao_Completo'] = df_base['Item_Filtro'] + " — " + df_base['Descricao_Filtro']
 
 aba_producao, aba_qualidade_pesagem, aba_qualidade_reatividade, aba_anomalias = st.tabs([
@@ -106,6 +101,8 @@ aba_producao, aba_qualidade_pesagem, aba_qualidade_reatividade, aba_anomalias = 
 with aba_producao:
     st.subheader("📦 Pesquisa Avançada")
     
+    # ORGANIZADO EM DUAS LINHAS SEM INDICAÇÕES DE COLUNAS
+    # Linha 1: Injetora e Expositor
     col_l1_c1, col_l1_c2 = st.columns(2)
     with col_l1_c1:
         maq_opcoes = ["Todas"] + df_base['Maquina_Filtro'].unique().tolist()
@@ -122,6 +119,7 @@ with aba_producao:
     if filtro_exp != "Todos":
         df_f = df_f[df_f['Expositor_Filtro'] == filtro_exp]
 
+    # Linha 2: Componente e Item / Descrição
     col_l2_c1, col_l2_c2 = st.columns(2)
     with col_l2_c1:
         comp_opcoes = ["Todos"] + df_f['Componente_Filtro'].unique().tolist()
