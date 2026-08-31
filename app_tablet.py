@@ -20,7 +20,7 @@ with col_titulo:
 
 st.markdown("---")
 
-# GARANTIR QUE O RELATÓRIO EXCEL EXISTA (Se não estiver na nuvem, roda o ETL integrado)
+# GARANTIR QUE O RELATÓRIO EXCEL EXISTA
 if not os.path.exists("Relatorio_Processo_Injecao_Atualizado.xlsx"):
     try:
         import automacao_grahl
@@ -54,21 +54,30 @@ except Exception as e:
     st.error(f"Erro ao ler a planilha de dados: {e}")
     st.stop()
 
-# Garantir os nomes exatos das colunas conforme o recorte da planilha
-colunas_necessarias = ['Maquina', 'Expositor', 'Componente', 'Codigo_Item', 'Descricao']
-for col in colunas_necessarias:
-    if col not in df_base.columns:
-        if col == 'Codigo_Item' and 'Item' in df_base.columns:
-            df_base['Codigo_Item'] = df_base['Item']
-        else:
-            df_base[col] = "GERAL"
+# Mapeamento rigoroso correspondente às colunas reais da planilha
+# Coluna B: Expositor | Coluna C: Componente | Coluna D: Item | Coluna E: Descricao
+if 'Expositor' not in df_base.columns and 'Modelo' in df_base.columns:
+    df_base['Expositor'] = df_base['Modelo']
+elif 'Expositor' not in df_base.columns:
+    df_base['Expositor'] = "GERAL"
 
-df_base['Expositor'] = df_base['Expositor'].fillna("GERAL").astype(str)
-df_base['Componente'] = df_base['Componente'].fillna("GERAL").astype(str)
-df_base['Codigo_Item'] = df_base['Codigo_Item'].astype(str)
-df_base['Descricao'] = df_base['Descricao'].astype(str)
+if 'Componente' not in df_base.columns:
+    df_base['Componente'] = "GERAL"
 
-# Criação da coluna concatenada para o filtro unificado de Item / Descrição
+if 'Codigo_Item' not in df_base.columns and 'Item' in df_base.columns:
+    df_base['Codigo_Item'] = df_base['Item']
+elif 'Codigo_Item' not in df_base.columns:
+    df_base['Codigo_Item'] = "000000"
+
+if 'Descricao' not in df_base.columns:
+    df_base['Descricao'] = "Item Geral"
+
+df_base['Expositor'] = df_base['Expositor'].fillna("GERAL").astype(str).str.strip()
+df_base['Componente'] = df_base['Componente'].fillna("GERAL").astype(str).str.strip()
+df_base['Codigo_Item'] = df_base['Codigo_Item'].astype(str).str.strip()
+df_base['Descricao'] = df_base['Descricao'].astype(str).str.strip()
+
+# Colunas D e E concatenadas para o item/descrição
 df_base['Item_Descricao'] = df_base['Codigo_Item'] + " — " + df_base['Descricao']
 
 aba_producao, aba_qualidade_pesagem, aba_qualidade_reatividade, aba_anomalias = st.tabs([
@@ -79,35 +88,38 @@ aba_producao, aba_qualidade_pesagem, aba_qualidade_reatividade, aba_anomalias = 
 ])
 
 with aba_producao:
-    st.subheader("📦 Pesquisa Avançada (Injetora ➔ Expositor ➔ Componente ➔ Item / Descrição)")
+    st.subheader("📦 Pesquisa Avançada")
     
-    col_f1, col_f2, col_f3, col_f4 = st.columns(4)
-    
-    with col_f1:
+    # ORGANIZADO EM DUAS LINHAS PARA VISIBILIDADE COMPLETA DO TEXTO
+    # Linha 1: Injetora e Expositor
+    col_l1_c1, col_l1_c2 = st.columns(2)
+    with col_l1_c1:
         maq_opcoes = ["Todas"] + df_base['Maquina'].unique().tolist()
-        filtro_maq = st.selectbox("1️⃣ Injetora:", maq_opcoes)
+        filtro_maq = st.selectbox("1️⃣ Injetora (Máquina):", maq_opcoes)
         
     df_f = df_base.copy()
     if filtro_maq != "Todas":
         df_f = df_f[df_f['Maquina'] == filtro_maq]
         
-    with col_f2:
+    with col_l1_c2:
         exp_opcoes = ["Todos"] + df_f['Expositor'].unique().tolist()
-        filtro_exp = st.selectbox("2️⃣ Expositor:", exp_opcoes)
+        filtro_exp = st.selectbox("2️⃣ Expositor (Coluna B):", exp_opcoes)
         
     if filtro_exp != "Todos":
         df_f = df_f[df_f['Expositor'] == filtro_exp]
-        
-    with col_f3:
+
+    # Linha 2: Componente e Item / Descrição
+    col_l2_c1, col_l2_c2 = st.columns(2)
+    with col_l2_c1:
         comp_opcoes = ["Todos"] + df_f['Componente'].unique().tolist()
-        filtro_comp = st.selectbox("3️⃣ Componente:", comp_opcoes)
+        filtro_comp = st.selectbox("3️⃣ Componente (Coluna C):", comp_opcoes)
         
     if filtro_comp != "Todos":
         df_f = df_f[df_f['Componente'] == filtro_comp]
         
-    with col_f4:
+    with col_l2_c2:
         item_desc_opcoes = ["Todos"] + df_f['Item_Descricao'].unique().tolist()
-        filtro_item_desc = st.selectbox("4️⃣ Item / Descrição:", item_desc_opcoes)
+        filtro_item_desc = st.selectbox("4️⃣ Item / Descrição (Colunas D & E):", item_desc_opcoes)
         
     if filtro_item_desc != "Todos":
         df_f = df_f[df_f['Item_Descricao'] == filtro_item_desc]
@@ -116,7 +128,6 @@ with aba_producao:
         st.warning("Nenhum item encontrado com os filtros selecionados.")
         st.stop()
         
-    # Como o filtro 4 já restringe o item de forma única ou direta, pegamos o primeiro registro filtrado
     dados_p = df_f.iloc[0]
     
     st.markdown("---")
