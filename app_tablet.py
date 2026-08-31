@@ -51,32 +51,37 @@ st.sidebar.markdown(f"**Status Térmico:** {cond_clima}")
 try:
     df_base = pd.read_excel("Relatorio_Processo_Injecao_Atualizado.xlsx")
 except Exception as e:
-    st.error(f"Error ao ler a planilha de dados: {e}")
+    st.error(f"Erro ao ler a planilha de dados: {e}")
     st.stop()
 
-# MAPEAMENTO POR POSIÇÃO EXATA DAS COLUNAS DA PLANILHA DE ENGENHARIA:
-# Coluna A (índice 0): Maquina
-# Coluna B (índice 1): Expositor
-# Coluna C (índice 2): Componente
-# Coluna D (índice 3): Item (Código)
-# Coluna E (índice 4): Descrição
-colunas_por_posicao = df_base.columns.tolist()
+# Limpeza e normalização dos nomes das colunas da planilha para evitar conflitos de maiúsculas/espaços
+df_base.columns = [str(c).strip() for c in df_base.columns]
 
-nome_col_maq = colunas_por_posicao[0] if len(colunas_por_posicao) > 0 else 'Maquina'
-nome_col_exp = colunas_por_posicao[1] if len(colunas_por_posicao) > 1 else 'Expositor'
-nome_col_comp = colunas_por_posicao[2] if len(colunas_por_posicao) > 2 else 'Componente'
-nome_col_item = colunas_por_posicao[3] if len(colunas_por_posicao) > 3 else 'Codigo_Item'
-nome_col_desc = colunas_por_posicao[4] if len(colunas_por_posicao) > 4 else 'Descricao'
+# MAPEAMENTO EXATO BASEADO NA ESTRUTURA DA PLANILHA:
+# Identifica a Máquina/Injetora
+col_maq_alvo = next((c for c in df_base.columns if 'maq' in c.lower() or 'injetora' in c.lower()), df_base.columns[0])
 
-# Atribuição segura com base nas colunas físicas reais
-df_base['Maquina_Real'] = df_base[nome_col_maq].fillna("GERAL").astype(str).str.strip()
-df_base['Expositor_Real'] = df_base[nome_col_exp].fillna("GERAL").astype(str).str.strip()
-df_base['Componente_Real'] = df_base[nome_col_comp].fillna("GERAL").astype(str).str.strip()
-df_base['Codigo_Item_Real'] = df_base[nome_col_item].fillna("0000").astype(str).str.strip()
-df_base['Descricao_Real'] = df_base[nome_col_desc].fillna("").astype(str).str.strip()
+# Identifica Expositor (Coluna B da planilha)
+col_exp_alvo = next((c for c in df_base.columns if 'expositor' in c.lower() or 'modelo' in c.lower()), 'Expositor')
 
-# Colunas D e E concatenadas para o item/descrição
-df_base['Item_Descricao'] = df_base['Codigo_Item_Real'] + " — " + df_base['Descricao_Real']
+# Identifica Componente (Coluna C da planilha)
+col_comp_alvo = next((c for c in df_base.columns if 'componente' in c.lower()), 'Componente')
+
+# Identifica Item (Coluna D da planilha)
+col_item_alvo = next((c for c in df_base.columns if c.lower() in ['item', 'código do item', 'codigo_item', 'codigo']), 'Item')
+
+# Identifica Descrição (Coluna E da planilha)
+col_desc_alvo = next((c for c in df_base.columns if 'descri' in c.lower()), 'Descrição')
+
+# Atribuição blindada ao DataFrame do app
+df_base['Maquina_Filtro'] = df_base[col_maq_alvo].fillna("GERAL").astype(str).str.strip()
+df_base['Expositor_Filtro'] = df_base[col_exp_alvo].fillna("GERAL").astype(str).str.strip()
+df_base['Componente_Filtro'] = df_base[col_comp_alvo].fillna("GERAL").astype(str).str.strip()
+df_base['Item_Filtro'] = df_base[col_item_alvo].fillna("0000").astype(str).str.strip()
+df_base['Descricao_Filtro'] = df_base[col_desc_alvo].fillna("").astype(str).str.strip()
+
+# Concatenado de Item e Descrição (Colunas D e E)
+df_base['Item_Descricao_Completo'] = df_base['Item_Filtro'] + " — " + df_base['Descricao_Filtro']
 
 aba_producao, aba_qualidade_pesagem, aba_qualidade_reatividade, aba_anomalias = st.tabs([
     "⚙️ Painel de Produção & Máquinas", 
@@ -88,39 +93,39 @@ aba_producao, aba_qualidade_pesagem, aba_qualidade_reatividade, aba_anomalias = 
 with aba_producao:
     st.subheader("📦 Pesquisa Avançada")
     
-    # ORGANIZADO EM DUAS LINHAS PARA VISIBILIDADE COMPLETA DO TEXTO EM CAMPO
-    # Linha 1: Injetora e Expositor (Coluna B)
+    # ORGANIZADO EM DUAS LINHAS PARA PERFEITA VISIBILIDADE EM CAMPO
+    # Linha 1: Injetora (Máquina) e Expositor (Coluna B)
     col_l1_c1, col_l1_c2 = st.columns(2)
     with col_l1_c1:
-        maq_opcoes = ["Todas"] + df_base['Maquina_Real'].unique().tolist()
+        maq_opcoes = ["Todas"] + df_base['Maquina_Filtro'].unique().tolist()
         filtro_maq = st.selectbox("1️⃣ Injetora (Máquina):", maq_opcoes)
         
     df_f = df_base.copy()
     if filtro_maq != "Todas":
-        df_f = df_f[df_f['Maquina_Real'] == filtro_maq]
+        df_f = df_f[df_f['Maquina_Filtro'] == filtro_maq]
         
     with col_l1_c2:
-        exp_opcoes = ["Todos"] + df_f['Expositor_Real'].unique().tolist()
+        exp_opcoes = ["Todos"] + df_f['Expositor_Filtro'].unique().tolist()
         filtro_exp = st.selectbox("2️⃣ Expositor (Coluna B):", exp_opcoes)
         
     if filtro_exp != "Todos":
-        df_f = df_f[df_f['Expositor_Real'] == filtro_exp]
+        df_f = df_f[df_f['Expositor_Filtro'] == filtro_exp]
 
-    # Linha 2: Componente (Coluna C) e Item/Descrição (Colunas D & E)
+    # Linha 2: Componente (Coluna C) e Item / Descrição (Colunas D e E)
     col_l2_c1, col_l2_c2 = st.columns(2)
     with col_l2_c1:
-        comp_opcoes = ["Todos"] + df_f['Componente_Real'].unique().tolist()
+        comp_opcoes = ["Todos"] + df_f['Componente_Filtro'].unique().tolist()
         filtro_comp = st.selectbox("3️⃣ Componente (Coluna C):", comp_opcoes)
         
     if filtro_comp != "Todos":
-        df_f = df_f[df_f['Componente_Real'] == filtro_comp]
+        df_f = df_f[df_f['Componente_Filtro'] == filtro_comp]
         
     with col_l2_c2:
-        item_desc_opcoes = ["Todos"] + df_f['Item_Descricao'].unique().tolist()
+        item_desc_opcoes = ["Todos"] + df_f['Item_Descricao_Completo'].unique().tolist()
         filtro_item_desc = st.selectbox("4️⃣ Item / Descrição (Colunas D & E):", item_desc_opcoes)
         
     if filtro_item_desc != "Todos":
-        df_f = df_f[df_f['Item_Descricao'] == filtro_item_desc]
+        df_f = df_f[df_f['Item_Descricao_Completo'] == filtro_item_desc]
         
     if len(df_f) == 0:
         st.warning("Nenhum item encontrado com os filtros selecionados.")
@@ -133,8 +138,8 @@ with aba_producao:
     col_info1, col_info2 = st.columns(2)
     
     with col_info1:
-        st.markdown(f"### ⚙️ Alvo no CLP — {dados_p['Maquina_Real']}")
-        st.info(f"**Expositor:** {dados_p['Expositor_Real']} | **Componente:** {dados_p['Componente_Real']}\n\n**Item / Descrição:** {dados_p['Item_Descricao']}")
+        st.markdown(f"### ⚙️ Alvo no CLP — {dados_p['Maquina_Filtro']}")
+        st.info(f"**Expositor:** {dados_p['Expositor_Filtro']} | **Componente:** {dados_p['Componente_Filtro']}\n\n**Item / Descrição:** {dados_p['Item_Descricao_Completo']}")
         st.write(f"**Volume do Molde:** {dados_p['Volume']} m³")
         st.write(f"**Condição Climática Ativa:** {dados_p['Condicao_Climatica']}")
         
@@ -144,7 +149,7 @@ with aba_producao:
     with col_info2:
         st.markdown("### 🛠️ Especificações de Processo & Densidades")
         st.markdown(f"""
-        * **Injetora:** {dados_p['Maquina_Real']}
+        * **Injetora:** {dados_p['Maquina_Filtro']}
         * **Vazão Calibrada:** {dados_p['Vazao_Cabecote_g_s']} g/s
         * **Pressão de Injeção Alvo:** {dados_p['Pressao_Injecao']}
         * **Relação I/P (Iso/Poliol):** {dados_p['Relacao_Iso_Pol']}
@@ -262,7 +267,7 @@ with aba_anomalias:
         col_a1, col_a2 = st.columns(2)
         with col_a1:
             a_data = st.date_input("Data da Ocorrência", datetime.now())
-            a_maquina = st.selectbox("Injetora / Máquina Afetada", df_base['Maquina_Real'].unique().tolist())
+            a_maquina = st.selectbox("Injetora / Máquina Afetada", df_base['Maquina_Filtro'].unique().tolist())
         with col_a2:
             a_responsavel_cargo = st.selectbox("Direcionar para o Responsável:", list(agenda_emails.keys()))
             a_email_destino = agenda_emails[a_responsavel_cargo]
