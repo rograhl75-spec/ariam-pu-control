@@ -54,29 +54,23 @@ except Exception as e:
     st.error(f"Erro ao ler a planilha de dados: {e}")
     st.stop()
 
-# Normalizar cabeçalhos removendo espaços extras
-df_base.columns = [str(c).strip() for c in df_base.columns]
+# MAPEAMENTO FÍSICO EXATO PELAS COLUNAS DO EXCEL:
+# Coluna B = Índice 1 (Expositor)
+# Coluna C = Índice 2 (Componente)
+# Coluna D = Índice 3 (Item)
+# Coluna E = Índice 4 (Descrição)
+# Coluna F = Índice 5 (Cabeçote)
 
-# MAPEAMENTO DIRETO E EXATO PELOS NOMES DOS CABEÇALHOS DA PLANILHA:
-# Coluna B: Expositor
-# Coluna C: Componente
-# Coluna D: Item
-# Coluna E: Descrição
-# Coluna F: Cabeçote
+# Garantimos que o DataFrame tenha pelo menos 6 colunas para evitar erros de índice
+while df_base.shape[1] < 6:
+    df_base[f'Col_{df_base.shape[1]}'] = ""
 
-col_exp = 'Expositor' if 'Expositor' in df_base.columns else df_base.columns[1]
-col_comp = 'Componente' if 'Componente' in df_base.columns else df_base.columns[2]
-col_item = 'Item' if 'Item' in df_base.columns else df_base.columns[3]
-col_desc = 'Descrição' if 'Descrição' in df_base.columns else ('Descricao' if 'Descricao' in df_base.columns else df_base.columns[4])
-col_cab = 'Cabeçote' if 'Cabeçote' in df_base.columns else ('Cabecote' if 'Cabecote' in df_base.columns else df_base.columns[5])
+df_base['Expositor_Filtro'] = df_base.iloc[:, 1].fillna("").astype(str).str.strip()
+df_base['Componente_Filtro'] = df_base.iloc[:, 2].fillna("").astype(str).str.strip()
+df_base['Item_Filtro'] = df_base.iloc[:, 3].fillna("").astype(str).str.strip()
+df_base['Descricao_Filtro'] = df_base.iloc[:, 4].fillna("").astype(str).str.strip()
 
-# Atribuição rigorosa aos filtros
-df_base['Expositor_Filtro'] = df_base[col_exp].fillna("").astype(str).str.strip()
-df_base['Componente_Filtro'] = df_base[col_comp].fillna("").astype(str).str.strip()
-df_base['Item_Filtro'] = df_base[col_item].fillna("").astype(str).str.strip()
-df_base['Descricao_Filtro'] = df_base[col_desc].fillna("").astype(str).str.strip()
-
-# Tradução do Cabeçote (Coluna F) para a Máquina
+# Tradução da Coluna F (Cabeçote) para Injetora
 def traduzir_cabecote(val):
     val_str = str(val).strip()
     if "1" in val_str:
@@ -86,7 +80,7 @@ def traduzir_cabecote(val):
     else:
         return val_str if val_str and val_str != "nan" else "Krauss Maffei 40/40"
 
-df_base['Maquina_Filtro'] = df_base[col_cab].apply(traduzir_cabecote)
+df_base['Maquina_Filtro'] = df_base.iloc[:, 5].apply(traduzir_cabecote)
 
 # Concatenado de Item e Descrição (Colunas D e E)
 df_base['Item_Descricao_Completo'] = df_base['Item_Filtro'] + " — " + df_base['Descricao_Filtro']
@@ -101,8 +95,7 @@ aba_producao, aba_qualidade_pesagem, aba_qualidade_reatividade, aba_anomalias = 
 with aba_producao:
     st.subheader("📦 Pesquisa Avançada")
     
-    # ORGANIZADO EM DUAS LINHAS SEM INDICAÇÕES DE COLUNAS
-    # Linha 1: Injetora e Expositor
+    # Linha 1: Injetora e Expositor (Coluna B)
     col_l1_c1, col_l1_c2 = st.columns(2)
     with col_l1_c1:
         maq_opcoes = ["Todas"] + df_base['Maquina_Filtro'].unique().tolist()
@@ -119,7 +112,7 @@ with aba_producao:
     if filtro_exp != "Todos":
         df_f = df_f[df_f['Expositor_Filtro'] == filtro_exp]
 
-    # Linha 2: Componente e Item / Descrição
+    # Linha 2: Componente (Coluna C) e Item/Descrição (Colunas D e E)
     col_l2_c1, col_l2_c2 = st.columns(2)
     with col_l2_c1:
         comp_opcoes = ["Todos"] + df_f['Componente_Filtro'].unique().tolist()
@@ -148,36 +141,37 @@ with aba_producao:
     with col_info1:
         st.markdown(f"### ⚙️ Alvo no CLP — {dados_p['Maquina_Filtro']}")
         st.info(f"**Expositor:** {dados_p['Expositor_Filtro']} | **Componente:** {dados_p['Componente_Filtro']}\n\n**Item / Descrição:** {dados_p['Item_Descricao_Completo']}")
-        st.write(f"**Volume do Molde:** {dados_p['Volume']} m³")
-        st.write(f"**Condição Climática Ativa:** {dados_p['Condicao_Climatica']}")
+        st.write(f"**Volume do Molde:** {dados_p.get('Volume', 0)} m³")
+        st.write(f"**Condição Climática Ativa:** {dados_p.get('Condicao_Climatica', 'Nominal')}")
         
-        st.metric("⚖️ MASSA IDEAL NA BALANÇA", f"{dados_p['Massa_Trabalho']:.2f} kg", f"Nominal: {dados_p['Massa_Nominal']} kg")
-        st.metric("⏱️ TEMPO NO TIMER", f"{dados_p['Tempo_Injecao_Seg']:.2f} segundos", f"Vazão Calibrada: {dados_p['Vazao_Cabecote_g_s']} g/s")
+        st.metric("⚖️ MASSA IDEAL NA BALANÇA", f"{dados_p.get('Massa_Trabalho', 0):.2f} kg", f"Nominal: {dados_p.get('Massa_Nominal', 0)} kg")
+        st.metric("⏱️ TEMPO NO TIMER", f"{dados_p.get('Tempo_Injecao_Seg', 0):.2f} segundos", f"Vazão Calibrada: {dados_p.get('Vazao_Cabecote_g_s', 0)} g/s")
 
     with col_info2:
         st.markdown("### 🛠️ Especificações de Processo & Densidades")
         st.markdown(f"""
         * **Injetora:** {dados_p['Maquina_Filtro']}
-        * **Vazão Calibrada:** {dados_p['Vazao_Cabecote_g_s']} g/s
-        * **Pressão de Injeção Alvo:** {dados_p['Pressao_Injecao']}
-        * **Relação I/P (Iso/Poliol):** {dados_p['Relacao_Iso_Pol']}
-        * **Densidade Mínima (Calor / Underpacking):** `{dados_p['Densidade_Calor']:.2f} kg/m³`
-        * **Densidade Nominal (Estável):** `{dados_p['Densidade_Nominal']:.2f} kg/m³`
-        * **Densidade Máxima (Frio / Overpacking):** `{dados_p['Densidade_Frio']:.2f} kg/m³`
-        * **🎯 Densidade Real Injetada (Ativa):** **`{dados_p['Densidade_Real_Calculada']:.2f} kg/m³`**
-        * **Temperatura dos Moldes:** {dados_p['Temp_Moldes_C']}
-        * **Setpoint dos Tanques:** {dados_p['Setpoint_Material_C']} °C
+        * **Vazão Calibrada:** {dados_p.get('Vazao_Cabecote_g_s', 0)} g/s
+        * **Pressão de Injeção Alvo:** {dados_p.get('Pressao_Injecao', 0)}
+        * **Relação I/P (Iso/Poliol):** {dados_p.get('Relacao_Iso_Pol', 0)}
+        * **Densidade Mínima (Calor / Underpacking):** `{dados_p.get('Densidade_Calor', 0):.2f} kg/m³`
+        * **Densidade Nominal (Estável):** `{dados_p.get('Densidade_Nominal', 0):.2f} kg/m³`
+        * **Densidade Máxima (Frio / Overpacking):** `{dados_p.get('Densidade_Frio', 0):.2f} kg/m³`
+        * **🎯 Densidade Real Injetada (Ativa):** **`{dados_p.get('Densidade_Real_Calculada', 0):.2f} kg/m³`**
+        * **Temperatura dos Moldes:** {dados_p.get('Temp_Moldes_C', 0)}
+        * **Setpoint dos Tanques:** {dados_p.get('Setpoint_Material_C', 0)} °C
         * **Teor de Ciclopentano (HC):** 9,71 % em peso
         """)
 
     st.markdown("---")
     st.subheader("🔬 Validação Estrutural (Resistência à Compressão NBR 8082)")
     res1, res2 = st.columns(2)
-    res1.metric("Resistência Estimada", f"{dados_p['Resistencia_Compressao_Est_kPa']:.1f} kPa", "Mínimo regulamentar: 110 kPa")
-    if "APROVADO" in dados_p['Status_Estrutural']:
-        res2.success(f"Status Mecânico: {dados_p['Status_Estrutural']}")
+    res1.metric("Resistência Estimada", f"{dados_p.get('Resistencia_Compressao_Est_kPa', 0):.1f} kPa", "Mínimo regulamentar: 110 kPa")
+    status_mec = str(dados_p.get('Status_Estrutural', 'APROVADO'))
+    if "APROVADO" in status_mec:
+        res2.success(f"Status Mecânico: {status_mec}")
     else:
-        res2.error(f"Status Mecânico: {dados_p['Status_Estrutural']}")
+        res2.error(f"Status Mecânico: {status_mec}")
 
 with aba_qualidade_pesagem:
     st.subheader("⚖️ Controle de Pesagem em Campo")
