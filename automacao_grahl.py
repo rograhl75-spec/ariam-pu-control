@@ -29,18 +29,20 @@ try:
     df_c2_clean['Vazao_Cabecote_g_s'] = 3000
     df_c2_clean['Pressao_Injecao'] = "140 ± 10 bar (Rim)"
 
-    # Mapeamento exato das colunas da planilha original:
-    # Índice 1 ou 2: Componente (ex: CAIXA, TAMPA)
-    # Índice 2 ou 3: Código do Item
-    # Índice 4: Descrição
+    # MAPEAMENTO CORRIGIDO E EXATO DAS COLUNAS DA PLANILHA ORIGINAL:
+    # Índice 1 (Coluna B): Expositor (ex: F01 CP)
+    # Índice 2 (Coluna C): Componente (ex: 22mm CABECEIRA)
+    # Índice 3 (Coluna D): Código do Item (ex: 59012064400)
+    # Índice 4 (Coluna E): Descrição do Item
     # Índice 6: Volume (m3)
     # Índice 7: Massa Nominal (Kg)
     # Índice 8: Massa Frio (Kg)
     # Índice 9: Massa Calor (Kg)
     for df_item in [df_c1_clean, df_c2_clean]:
         df_item.rename(columns={
-            1: 'Componente',
-            2: 'Codigo_Item',
+            1: 'Expositor',
+            2: 'Componente',
+            3: 'Codigo_Item',
             4: 'Descricao',
             6: 'Volume',
             7: 'Massa_Nominal',
@@ -48,15 +50,15 @@ try:
             9: 'Massa_Calor'
         }, inplace=True)
 
-    colunas_interesse = ['Componente', 'Codigo_Item', 'Descricao', 'Volume', 'Massa_Nominal', 'Massa_Frio', 'Massa_Calor', 'Maquina', 'Cabecote_Ref', 'Vazao_Cabecote_g_s', 'Pressao_Injecao']
+    colunas_interesse = ['Expositor', 'Componente', 'Codigo_Item', 'Descricao', 'Volume', 'Massa_Nominal', 'Massa_Frio', 'Massa_Calor', 'Maquina', 'Cabecote_Ref', 'Vazao_Cabecote_g_s', 'Pressao_Injecao']
     
     df_produtos = pd.concat([df_c1_clean[colunas_interesse], df_c2_clean[colunas_interesse]], ignore_index=True)
     df_produtos = df_produtos.dropna(subset=['Codigo_Item', 'Volume'])
     
-    print("      -> Abas CAB 1 e CAB 2 unificadas com sucesso!")
+    print("     -> Abas CAB 1 e CAB 2 unificadas com sucesso!")
 
 except Exception as e:
-    print(f"      -> Erro ao ler abas: {e}")
+    print(f"     -> Erro ao ler abas: {e}")
     exit()
 
 df_produtos['Volume'] = pd.to_numeric(df_produtos['Volume'], errors='coerce')
@@ -74,10 +76,10 @@ try:
     url_meteo = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
     resposta = requests.get(url_meteo, timeout=5)
     temp_atual = float(resposta.json()['current_weather']['temperature'])
-    print(f"      -> Temperatura capturada com sucesso via satélite: {temp_atual} °C")
+    print(f"     -> Temperatura capturada com sucesso via satélite: {temp_atual} °C")
 except Exception:
     temp_atual = 24.0
-    print(f"      -> Modo offline ativado. Temperatura padrão: {temp_atual} °C")
+    print(f"     -> Modo offline ativado. Temperatura padrão: {temp_atual} °C")
 
 # 3. AVALIAÇÃO SAZONAL E CÁLCULO DE DENSIDADES
 print("[3/4] Reavaliando parâmetros de máquina, massas e densidades...")
