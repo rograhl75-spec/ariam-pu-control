@@ -54,36 +54,26 @@ except Exception as e:
     st.error(f"Erro ao ler a planilha de dados: {e}")
     st.stop()
 
-# Normalizar os nomes dos cabeçalhos da planilha (removendo espaços extras)
-df_base.columns = [str(c).strip() for c in df_base.columns]
+# GARANTIR QUE O DATAFRAME TENHA COLUNAS SUFICIENTES
+while df_base.shape[1] < 6:
+    df_base[f'Col_{df_base.shape[1]}'] = ""
 
-# MAPEAMENTO EXATO COM BASE NA SUA IMAGEM:
-# - Expositor (Coluna B)
-# - Componente (Coluna C)
-# - Item (Coluna D)
-# - Descrição (Coluna E)
-# - Cabeçote (Coluna F)
+# MAPEAMENTO FÍSICO EXATO DA SUA PLANILHA (Índices do Python):
+# Índice 1 = Coluna B (Expositor)
+# Índice 2 = Coluna C (Componente)
+# Índice 3 = Coluna D (Item - Códigos numéricos)
+# Índice 4 = Coluna E (Descrição)
+# Índice 5 = Coluna F (Cabeçote)
 
-def achar_coluna(df, lista_candidatos):
-    for cand in lista_candidatos:
-        for col in df.columns:
-            if cand.lower() in col.lower():
-                return col
-    return None
+df_base['Expositor_Real'] = df_base.iloc[:, 1].fillna("").astype(str).str.strip()
+df_base['Componente_Real'] = df_base.iloc[:, 2].fillna("").astype(str).str.strip()
+df_base['Item_Real'] = df_base.iloc[:, 3].fillna("").astype(str).str.strip()
+df_base['Descricao_Real'] = df_base.iloc[:, 4].fillna("").astype(str).str.strip()
 
-c_exp = achar_coluna(df_base, ['expositor'])
-c_comp = achar_coluna(df_base, ['componente'])
-c_item = achar_coluna(df_base, ['item', 'codigo'])
-c_desc = achar_coluna(df_base, ['descri'])
-c_cab = achar_coluna(df_base, ['cabeçote', 'cabecote'])
+# Item (Código) + Descrição concatenados corretamente para o filtro 4
+df_base['Item_Descricao_Completo'] = df_base['Item_Real'] + " — " + df_base['Descricao_Real']
 
-# Atribuição segura garantindo que cada variável aponte para a coluna certa
-df_base['Expositor_Filtro'] = df_base[c_exp].fillna("GERAL").astype(str).str.strip() if c_exp else "GERAL"
-df_base['Componente_Filtro'] = df_base[c_comp].fillna("GERAL").astype(str).str.strip() if c_comp else "GERAL"
-df_base['Item_Filtro'] = df_base[c_item].fillna("").astype(str).str.strip() if c_item else ""
-df_base['Descricao_Filtro'] = df_base[c_desc].fillna("").astype(str).str.strip() if c_desc else ""
-
-# Tradução do Cabeçote (Coluna F: 1 = Krauss Maffei 40/40 | 2 = Krauss Maffei 80/80)
+# Tradução da Coluna F (Cabeçote) para Máquina
 def traduzir_cabecote(val):
     val_str = str(val).strip()
     if "1" in val_str:
@@ -93,15 +83,7 @@ def traduzir_cabecote(val):
     else:
         return val_str if val_str and val_str != "nan" else "Krauss Maffei 40/40"
 
-if c_cab:
-    df_base['Maquina_Filtro'] = df_base[c_cab].apply(traduzir_cabecote)
-elif 'Maquina' in df_base.columns:
-    df_base['Maquina_Filtro'] = df_base['Maquina'].fillna("Krauss Maffei 40/40").astype(str).str.strip()
-else:
-    df_base['Maquina_Filtro'] = "Krauss Maffei 40/40"
-
-# Item e Descrição concatenados para o filtro unificado (Colunas D e E)
-df_base['Item_Descricao_Completo'] = df_base['Item_Filtro'] + " — " + df_base['Descricao_Filtro']
+df_base['Maquina_Filtro'] = df_base.iloc[:, 5].apply(traduzir_cabecote)
 
 aba_producao, aba_qualidade_pesagem, aba_qualidade_reatividade, aba_anomalias = st.tabs([
     "⚙️ Painel de Produção & Máquinas", 
@@ -125,20 +107,20 @@ with aba_producao:
         df_f = df_f[df_f['Maquina_Filtro'] == filtro_maq]
         
     with col_l1_c2:
-        exp_opcoes = ["Todos"] + df_f['Expositor_Filtro'].unique().tolist()
+        exp_opcoes = ["Todos"] + df_f['Expositor_Real'].unique().tolist()
         filtro_exp = st.selectbox("Expositor:", exp_opcoes)
         
     if filtro_exp != "Todos":
-        df_f = df_f[df_f['Expositor_Filtro'] == filtro_exp]
+        df_f = df_f[df_f['Expositor_Real'] == filtro_exp]
 
     # Linha 2: Componente (Coluna C) e Item / Descrição (Colunas D e E)
     col_l2_c1, col_l2_c2 = st.columns(2)
     with col_l2_c1:
-        comp_opcoes = ["Todos"] + df_f['Componente_Filtro'].unique().tolist()
+        comp_opcoes = ["Todos"] + df_f['Componente_Real'].unique().tolist()
         filtro_comp = st.selectbox("Componente:", comp_opcoes)
         
     if filtro_comp != "Todos":
-        df_f = df_f[df_f['Componente_Filtro'] == filtro_comp]
+        df_f = df_f[df_f['Componente_Real'] == filtro_comp]
         
     with col_l2_c2:
         item_desc_opcoes = ["Todos"] + df_f['Item_Descricao_Completo'].unique().tolist()
@@ -159,7 +141,7 @@ with aba_producao:
     
     with col_info1:
         st.markdown(f"### ⚙️ Alvo no CLP — {dados_p['Maquina_Filtro']}")
-        st.info(f"**Expositor:** {dados_p['Expositor_Filtro']} | **Componente:** {dados_p['Componente_Filtro']}\n\n**Item / Descrição:** {dados_p['Item_Descricao_Completo']}")
+        st.info(f"**Expositor:** {dados_p['Expositor_Real']} | **Componente:** {dados_p['Componente_Real']}\n\n**Item / Descrição:** {dados_p['Item_Descricao_Completo']}")
         st.write(f"**Volume do Molde:** {dados_p.get('Volume', 0)} m³")
         st.write(f"**Condição Climática Ativa:** {dados_p.get('Condicao_Climatica', 'Nominal')}")
         
