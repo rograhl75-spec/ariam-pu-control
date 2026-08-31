@@ -230,10 +230,10 @@ with aba_qualidade_reatividade:
         st.markdown("### 📊 Histórico de Reatividade")
         st.dataframe(pd.read_excel("Log_Controle_Reatividade_DOC0001.xlsx"))
 
-# ABA 4: REGISTRO DE ANOMALIAS + HORÁRIO AJUSTADO PARA BRASÍLIA (BRT / UTC-3)
+# ABA 4: REGISTRO DE ANOMALIAS + ID DE PENDÊNCIA + VISUALIZADOR DETALHADO
 with aba_anomalias:
     st.subheader("⚠️ Registro de Anomalias & Abertura de Ocorrência")
-    st.markdown("Registre a não conformidade. O horário será capturado automaticamente pelo horário de Brasília.")
+    st.markdown("Registre a não conformidade. Um número de ID (Pendência) será gerado automaticamente.")
     
     agenda_emails = {
         "Rogério Grahl (Engenheiro Consultor) — Rograhl75@gmail.com": "Rograhl75@gmail.com",
@@ -249,7 +249,6 @@ with aba_anomalias:
         st.markdown("### 1️⃣ Dados da Ocorrência")
         col_a1, col_a2 = st.columns(2)
         with col_a1:
-            # Fuso horário de Brasília (UTC-3)
             fuso_br = timezone(timedelta(hours=-3))
             data_atual_br = datetime.now(fuso_br).date()
             a_data = st.date_input("Data da Ocorrência", data_atual_br)
@@ -282,11 +281,20 @@ with aba_anomalias:
             if not a_problema.strip():
                 st.warning("Por favor, descreva o problema antes de salvar a ocorrência.")
             else:
-                # Captura o horário exato ajustado para Brasília (UTC-3)
+                arq_anomalias = "Log_Registro_Anomalias.xlsx"
+                
+                # Gera ID sequencial da pendência (ex: OC-001, OC-002...)
+                try:
+                    df_temp_id = pd.read_excel(arq_anomalias)
+                    proximo_id = f"OC-{len(df_temp_id) + 1:03d}"
+                except:
+                    proximo_id = "OC-001"
+
                 fuso_br = timezone(timedelta(hours=-3))
-                a_hora_sistema = datetime.now(fuso_br).strftime("%H:%M:%S")
+                a_hora_sistema = datetime.now(fuso_br).strftime("%H:%M")
                 
                 novo_reg_anom = {
+                    "ID": proximo_id,
                     "Data": a_data.strftime("%d/%m/%Y"),
                     "Hora": a_hora_sistema,
                     "Máquina": a_maquina,
@@ -301,7 +309,7 @@ with aba_anomalias:
                     "How (Como)": w_how if w_how.strip() else "Não informado na abertura",
                     "Status": status_tratativa
                 }
-                arq_anomalias = "Log_Registro_Anomalias.xlsx"
+                
                 try:
                     df_anom = pd.read_excel(arq_anomalias)
                     df_anom = pd.concat([df_anom, pd.DataFrame([novo_reg_anom])], ignore_index=True)
@@ -318,13 +326,14 @@ with aba_anomalias:
                     msg = MIMEMultipart()
                     msg['From'] = remetente_email
                     msg['To'] = a_email_destino
-                    msg['Subject'] = f"[ALERTA PU 4.0 - OCORRÊNCIA] Não Conformidade em {a_maquina}"
+                    msg['Subject'] = f"[ALERTA PU 4.0 - {proximo_id}] Não Conformidade em {a_maquina}"
                     
                     corpo_email = f"""
                     Prezado(a) {a_responsavel_cargo},
                     
-                    Uma nova ocorrência foi aberta no sistema ARIAM PU Control 4.0 e requer sua atenção:
+                    Uma nova ocorrência ({proximo_id}) foi aberta no sistema ARIAM PU Control 4.0 e requer sua atenção:
                     
+                    - ID da Pendência: {proximo_id}
                     - Data/Hora: {a_data.strftime('%d/%m/%Y')} às {a_hora_sistema}
                     - Máquina Afetada: {a_maquina}
                     - Descrição do Problema: {a_problema}
@@ -349,14 +358,47 @@ with aba_anomalias:
                     server.sendmail(remetente_email, a_email_destino, msg.as_string())
                     server.quit()
                     
-                    st.success(f"Ocorrência salva e e-mail de alerta disparado com sucesso para **{a_email_destino}**!")
+                    st.success(f"Ocorrência **{proximo_id}** salva e e-mail de alerta disparado com sucesso para **{a_email_destino}**!")
                 except Exception as ex:
-                    st.warning(f"Ocorrência salva com sucesso na planilha (Horário: {a_hora_sistema}), mas houve falha no envio do e-mail: {ex}")
+                    st.warning(f"Ocorrência {proximo_id} salva com sucesso na planilha, mas houve falha no envio do e-mail: {ex}")
 
+    # HISTÓRICO LIMPO E VISUALIZADOR DETALHADO POR ID
     if os.path.exists("Log_Registro_Anomalias.xlsx"):
         st.markdown("---")
-        st.markdown("### 📊 Histórico Geral de Ocorrências & Planos 5W1H")
-        st.dataframe(pd.read_excel("Log_Registro_Anomalias.xlsx"))
+        st.markdown("### 📊 Histórico Geral de Ocorrências & Pendências")
+        df_hist = pd.read_excel("Log_Registro_Anomalias.xlsx")
+        
+        # Garante coluna ID para registros antigos que não tinham
+        if 'ID' not in df_hist.columns:
+            df_hist.insert(0, 'ID', [f"OC-{i+1:03d}" for i in range(len(df_hist))])
+            df_hist.to_excel("Log_Registro_Anomalias.xlsx", index=False)
+            
+        # Exibe uma tabela resumida e limpa (sem espremer o texto do problema)
+        colunas_resumo = ['ID', 'Data', 'Hora', 'Máquina', 'Responsável', 'Status']
+        st.dataframe(df_hist[colunas_resumo], use_container_width=True)
+        
+        st.markdown("#### 🔍 Detalhes da Ocorrência & Plano 5W1H")
+        lista_ids = df_hist['ID'].tolist()
+        id_selecionado = st.selectbox("Selecione o ID da Pendência para ver a descrição completa:", lista_ids)
+        
+        if id_selecionado:
+            registro_detalhe = df_hist[df_hist['ID'] == id_selecionado].iloc[0]
+            
+            st.info(f"**Pendência:** {registro_detalhe['ID']} | **Data/Hora:** {registro_detalhe['Data']} às {registro_detalhe['Hora']} | **Máquina:** {registro_detalhe['Máquina']}")
+            st.markdown(f"**👤 Responsável:** {registro_detalhe['Responsável']} (`{registro_detalhe['E-mail Destino']}`)")
+            st.markdown(f"**⚠️ Descrição do Problema:**\n> {registro_detalhe['Problema']}")
+            
+            with st.expander("📋 Ver Matriz 5W1H Completa desta Ocorrência"):
+                c_ex1, c_ex2 = st.columns(2)
+                with c_ex1:
+                    st.write(f"**What (Ação):** {registro_detalhe['What (Ação)']}")
+                    st.write(f"**Why (Justificativa):** {registro_detalhe['Why (Por que)']}")
+                    st.write(f"**Where (Local):** {registro_detalhe['Where (Onde)']}")
+                with c_ex2:
+                    st.write(f"**When (Prazo):** {registro_detalhe['When (Quando)']}")
+                    st.write(f"**Who (Quem):** {registro_detalhe['Who (Quem)']}")
+                    st.write(f"**How (Método):** {registro_detalhe['How (Como)']}")
+                st.write(f"**Status Atual:** {registro_detalhe['Status']}")
 
 st.markdown("---")
 st.caption("Grahl Consultoria e Treinamentos — Tecnologia aplicada ao chão de fábrica.")
