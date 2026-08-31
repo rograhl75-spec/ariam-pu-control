@@ -54,31 +54,28 @@ except Exception as e:
     st.error(f"Erro ao ler a planilha de dados: {e}")
     st.stop()
 
-# Mapeamento rigoroso correspondente às colunas reais da planilha
+# MAPEAMENTO EXATO DAS COLUNAS DA PLANILHA DE ENGENHARIA:
 # Coluna B: Expositor | Coluna C: Componente | Coluna D: Item | Coluna E: Descricao
-if 'Expositor' not in df_base.columns and 'Modelo' in df_base.columns:
-    df_base['Expositor'] = df_base['Modelo']
-elif 'Expositor' not in df_base.columns:
-    df_base['Expositor'] = "GERAL"
+# Tratativa para garantir que os nomes das colunas capturem corretamente do Excel
+colunas_existentes = [c.strip() for c in df_base.columns]
 
-if 'Componente' not in df_base.columns:
-    df_base['Componente'] = "GERAL"
+# Identifica Expositor (Coluna B)
+col_exp = next((c for c in df_base.columns if 'expositor' in str(c).lower() or 'modelo' in str(c).lower()), 'Expositor')
+# Identifica Componente (Coluna C)
+col_comp = next((c for c in df_base.columns if 'componente' in str(c).lower()), 'Componente')
+# Identifica Item (Coluna D)
+col_item = next((c for c in df_base.columns if 'item' in str(c).lower() or 'codigo' in str(c).lower()), 'Codigo_Item')
+# Identifica Descricao (Coluna E)
+col_desc = next((c for c in df_base.columns if 'descri' in str(c).lower()), 'Descricao')
 
-if 'Codigo_Item' not in df_base.columns and 'Item' in df_base.columns:
-    df_base['Codigo_Item'] = df_base['Item']
-elif 'Codigo_Item' not in df_base.columns:
-    df_base['Codigo_Item'] = "000000"
-
-if 'Descricao' not in df_base.columns:
-    df_base['Descricao'] = "Item Geral"
-
-df_base['Expositor'] = df_base['Expositor'].fillna("GERAL").astype(str).str.strip()
-df_base['Componente'] = df_base['Componente'].fillna("GERAL").astype(str).str.strip()
-df_base['Codigo_Item'] = df_base['Codigo_Item'].astype(str).str.strip()
-df_base['Descricao'] = df_base['Descricao'].astype(str).str.strip()
+# Atribui e padroniza no DataFrame de forma garantida
+df_base['Expositor_Real'] = df_base[col_exp].fillna("GERAL").astype(str).str.strip()
+df_base['Componente_Real'] = df_base[col_comp].fillna("GERAL").astype(str).str.strip()
+df_base['Codigo_Item_Real'] = df_base[col_item].fillna("0000").astype(str).str.strip()
+df_base['Descricao_Real'] = df_base[col_desc].fillna("").astype(str).str.strip()
 
 # Colunas D e E concatenadas para o item/descrição
-df_base['Item_Descricao'] = df_base['Codigo_Item'] + " — " + df_base['Descricao']
+df_base['Item_Descricao'] = df_base['Codigo_Item_Real'] + " — " + df_base['Descricao_Real']
 
 aba_producao, aba_qualidade_pesagem, aba_qualidade_reatividade, aba_anomalias = st.tabs([
     "⚙️ Painel de Produção & Máquinas", 
@@ -91,7 +88,7 @@ with aba_producao:
     st.subheader("📦 Pesquisa Avançada")
     
     # ORGANIZADO EM DUAS LINHAS PARA VISIBILIDADE COMPLETA DO TEXTO
-    # Linha 1: Injetora e Expositor
+    # Linha 1: Injetora e Expositor (Coluna B)
     col_l1_c1, col_l1_c2 = st.columns(2)
     with col_l1_c1:
         maq_opcoes = ["Todas"] + df_base['Maquina'].unique().tolist()
@@ -102,20 +99,20 @@ with aba_producao:
         df_f = df_f[df_f['Maquina'] == filtro_maq]
         
     with col_l1_c2:
-        exp_opcoes = ["Todos"] + df_f['Expositor'].unique().tolist()
+        exp_opcoes = ["Todos"] + df_f['Expositor_Real'].unique().tolist()
         filtro_exp = st.selectbox("2️⃣ Expositor (Coluna B):", exp_opcoes)
         
     if filtro_exp != "Todos":
-        df_f = df_f[df_f['Expositor'] == filtro_exp]
+        df_f = df_f[df_f['Expositor_Real'] == filtro_exp]
 
-    # Linha 2: Componente e Item / Descrição
+    # Linha 2: Componente (Coluna C) e Item/Descrição (Colunas D & E)
     col_l2_c1, col_l2_c2 = st.columns(2)
     with col_l2_c1:
-        comp_opcoes = ["Todos"] + df_f['Componente'].unique().tolist()
+        comp_opcoes = ["Todos"] + df_f['Componente_Real'].unique().tolist()
         filtro_comp = st.selectbox("3️⃣ Componente (Coluna C):", comp_opcoes)
         
     if filtro_comp != "Todos":
-        df_f = df_f[df_f['Componente'] == filtro_comp]
+        df_f = df_f[df_f['Componente_Real'] == filtro_comp]
         
     with col_l2_c2:
         item_desc_opcoes = ["Todos"] + df_f['Item_Descricao'].unique().tolist()
@@ -136,7 +133,7 @@ with aba_producao:
     
     with col_info1:
         st.markdown(f"### ⚙️ Alvo no CLP — {dados_p['Maquina']}")
-        st.info(f"**Expositor:** {dados_p['Expositor']} | **Componente:** {dados_p['Componente']}\n\n**Item / Descrição:** {dados_p['Item_Descricao']}")
+        st.info(f"**Expositor:** {dados_p['Expositor_Real']} | **Componente:** {dados_p['Componente_Real']}\n\n**Item / Descrição:** {dados_p['Item_Descricao']}")
         st.write(f"**Volume do Molde:** {dados_p['Volume']} m³")
         st.write(f"**Condição Climática Ativa:** {dados_p['Condicao_Climatica']}")
         
