@@ -79,7 +79,6 @@ aba_producao, aba_qualidade_pesagem, aba_qualidade_reatividade, aba_anomalias = 
 with aba_producao:
     st.subheader("📦 Pesquisa Avançada")
     
-    # ORGANIZADO EM DUAS LINHAS SEM INDICAÇÕES DE COLUNAS
     # Linha 1: Injetora e Expositor
     col_l1_c1, col_l1_c2 = st.columns(2)
     with col_l1_c1:
@@ -233,19 +232,20 @@ with aba_qualidade_reatividade:
         st.markdown("### 📊 Histórico de Reatividade")
         st.dataframe(pd.read_excel("Log_Controle_Reatividade_DOC0001.xlsx"))
 
-# ABA 4: REGISTRO DE ANOMALIAS + HORÁRIO AUTOMÁTICO + 5W1H OPCIONAL + SMTP CONFIGURADO
+# ABA 4: REGISTRO DE ANOMALIAS + CADASTRO DE E-MAILS CLARO
 with aba_anomalias:
     st.subheader("⚠️ Registro de Anomalias & Abertura de Ocorrência")
-    st.markdown("Registre a não conformidade. O horário será capturado automaticamente pelo sistema.")
+    st.markdown("Registre a não conformidade. O e-mail será disparado automaticamente para o responsável selecionado.")
     
+    # LISTA CENTRALIZADA DE RESPONSÁVEIS E E-MAILS
     agenda_emails = {
-        "Rogério Grahl — Engenheiro Consultor": "Rograhl75@gmail.com",
-        "Pedro Mantovani — Gerente Slitter": "pedro.mantovani@fastgondolas.com.br",
-        "Israel Silva — Gerente Montagem": "israel.silva@ariamequipamentos.com.br",
-        "Roberto Silva — Supervisor Qualidade": "roberto.silva@fastgondolas.com.br",
-        "André Caseiro — Engenharia Processos": "andre.caseiro@ariamequipamentos.com.br",
-        "Robson Milanez — Gerente Manutenção": "robson.milanez@fastgondolas.com.br",
-        "Gledston Santana — Gerente Qualidade": "gledston.santana@fastgondolas.com.br"
+        "Rogério Grahl (Engenheiro Consultor) — Rograhl75@gmail.com": "Rograhl75@gmail.com",
+        "Pedro Mantovani (Gerente Slitter) — pedro.mantovani@fastgondolas.com.br": "pedro.mantovani@fastgondolas.com.br",
+        "Israel Silva (Gerente Montagem) — israel.silva@ariamequipamentos.com.br": "israel.silva@ariamequipamentos.com.br",
+        "Roberto Silva (Supervisor Qualidade) — roberto.silva@fastgondolas.com.br": "roberto.silva@fastgondolas.com.br",
+        "André Caseiro (Engenharia Processos) — andre.caseiro@ariamequipamentos.com.br": "andre.caseiro@ariamequipamentos.com.br",
+        "Robson Milanez (Gerente Manutenção) — robson.milanez@fastgondolas.com.br": "robson.milanez@fastgondolas.com.br",
+        "Gledston Santana (Gerente Qualidade) — gledston.santana@fastgondolas.com.br": "gledston.santana@fastgondolas.com.br"
     }
     
     with st.form("form_anomalia"):
@@ -255,9 +255,10 @@ with aba_anomalias:
             a_data = st.date_input("Data da Ocorrência", datetime.now())
             a_maquina = st.selectbox("Injetora / Máquina Afetada", df_base['Maquina_Filtro'].unique().tolist())
         with col_a2:
-            a_responsavel_cargo = st.selectbox("Direcionar para o Responsável:", list(agenda_emails.keys()))
-            a_email_destino = agenda_emails[a_responsavel_cargo]
-            st.text_input("E-mail de Destino:", value=a_email_destino, disabled=True)
+            resp_selecionado = st.selectbox("Direcionar para o Responsável:", list(agenda_emails.keys()))
+            a_email_destino = agenda_emails[resp_selecionado]
+            # Extrai apenas o nome legível para o log e e-mail
+            a_responsavel_cargo = resp_selecionado.split(" — ")[0]
             
         a_problema = st.text_area("Descrição do Problema Detectado (Ocorrência):", placeholder="Ex: Desvio de densidade acima do limite superior...")
         
