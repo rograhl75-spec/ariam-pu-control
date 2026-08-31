@@ -20,6 +20,14 @@ with col_titulo:
 
 st.markdown("---")
 
+# GARANTIR QUE O RELATÓRIO EXCEL EXISTA (Se não estiver na nuvem, roda o ETL integrado)
+if not os.path.exists("Relatorio_Processo_Injecao_Atualizado.xlsx"):
+    try:
+        import automacao_grahl
+    except Exception as e:
+        st.error(f"Erro crítico ao gerar base de dados automática: {e}")
+        st.stop()
+
 @st.cache_data(ttl=600)
 def obter_temp():
     try:
@@ -42,8 +50,8 @@ st.sidebar.markdown(f"**Status Térmico:** {cond_clima}")
 
 try:
     df_base = pd.read_excel("Relatorio_Processo_Injecao_Atualizado.xlsx")
-except:
-    st.error("Rode o script de automação primeiro (`python automacao_grahl.py`)!")
+except Exception as e:
+    st.error(f"Erro ao ler a planilha de dados: {e}")
     st.stop()
 
 df_base['Componente'] = df_base['Componente'].fillna("GERAL").astype(str)
@@ -265,7 +273,6 @@ with aba_anomalias:
             if not a_problema.strip():
                 st.warning("Por favor, descreva o problema antes de salvar.")
             else:
-                # 1. Salvar no Excel
                 novo_reg_anom = {
                     "Data": a_data.strftime("%d/%m/%Y"),
                     "Hora": a_hora,
@@ -289,12 +296,11 @@ with aba_anomalias:
                     df_anom = pd.DataFrame([novo_reg_anom])
                 df_anom.to_excel(arq_anomalias, index=False)
                 
-                # 2. Envio Real via SMTP do Gmail
                 try:
                     smtp_server = "smtp.gmail.com"
                     smtp_port = 587
                     remetente_email = "Rograhl75@gmail.com"
-                    senha_app = "vjmy jjow oioc isut" # Substitua pelos 16 dígitos gerados no Google
+                    senha_app = "SUA_SENHA_DE_APP_AQUI"
                     
                     msg = MIMEMultipart()
                     msg['From'] = remetente_email
@@ -332,7 +338,7 @@ with aba_anomalias:
                     
                     st.success(f"Ocorrência salva e e-mail disparado com sucesso para **{a_email_destino}**!")
                 except Exception as ex:
-                    st.warning(f"Ocorrência salva na planilha, mas houve falha no envio do e-mail. Verifique se a Senha de App foi inserida corretamente no código. (Detalhe: {ex})")
+                    st.warning(f"Ocorrência salva na planilha, mas houve falha no envio do e-mail: {ex}")
 
     if os.path.exists("Log_Registro_Anomalias.xlsx"):
         st.markdown("---")
