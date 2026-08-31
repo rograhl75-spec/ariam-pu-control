@@ -300,7 +300,7 @@ with aba_anomalias:
                     smtp_server = "smtp.gmail.com"
                     smtp_port = 587
                     remetente_email = "Rograhl75@gmail.com"
-                    senha_app = "SUA_SENHA_DE_APP_AQUI"
+                    senha_app = "wrbf oqou loik cwkb"
                     
                     msg = MIMEMultipart()
                     msg['From'] = remetente_email
