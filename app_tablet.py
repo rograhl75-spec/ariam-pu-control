@@ -223,10 +223,10 @@ with aba_qualidade_reatividade:
         st.markdown("### 📊 Histórico de Reatividade")
         st.dataframe(pd.read_excel("Log_Controle_Reatividade_DOC0001.xlsx"))
 
-# ABA 4: REGISTRO DE ANOMALIAS + 5W1H + ENVIO REAL DE E-MAIL SMTP
+# ABA 4: REGISTRO DE ANOMALIAS + ENVIO IMEDIATO DE E-MAIL SMTP (5W1H OPCIONAL)
 with aba_anomalias:
-    st.subheader("⚠️ Registro de Anomalias & Plano de Ação (Metodologia 5W1H)")
-    st.markdown("Registre a não conformidade. Ao salvar, o sistema enviará o alerta real por e-mail para o responsável.")
+    st.subheader("⚠️ Registro de Anomalias & Abertura de Ocorrência")
+    st.markdown("Registre a não conformidade para envio imediato do alerta por e-mail ao responsável.")
     
     agenda_emails = {
         "Rogério Grahl — Engenheiro Consultor": "Rograhl75@gmail.com",
@@ -234,12 +234,12 @@ with aba_anomalias:
         "Israel Silva — Gerente Montagem": "israel.silva@ariamequipamentos.com.br",
         "Roberto Silva — Supervisor Qualidade": "roberto.silva@fastgondolas.com.br",
         "André Caseiro — Engenharia Processos": "andre.caseiro@ariamequipamentos.com.br",
-        "Robson Milanez — Gerente Manutenção": "robson.milanez@ariamequipamentos.com.br",
+        "Robson Milanez — Gerente Manutenção": "robson.milanez@fastgondolas.com.br",
         "Gledston Santana — Gerente Qualidade": "gledston.santana@fastgondolas.com.br"
     }
     
     with st.form("form_anomalia"):
-        st.markdown("### 1️⃣ Abertura da Ocorrência")
+        st.markdown("### 1️⃣ Dados da Ocorrência")
         col_a1, col_a2 = st.columns(2)
         with col_a1:
             a_data = st.date_input("Data da Ocorrência", datetime.now())
@@ -253,25 +253,25 @@ with aba_anomalias:
         a_problema = st.text_area("Descrição do Problema Detectado (Ocorrência):", placeholder="Ex: Desvio de densidade acima do limite superior...")
         
         st.markdown("---")
-        st.markdown("### 2️⃣ Matriz de Tratativa Corretiva — 5W1H")
+        st.markdown("### 2️⃣ Matriz de Tratativa Corretiva — 5W1H (Opcional na Abertura)")
         
         col_5w1, col_5w2 = st.columns(2)
         with col_5w1:
-            w_what = st.text_input("1. What (O que será feito? / Ação Corretiva):", placeholder="Ex: Ajustar vazão e recalibrar cabeçote")
-            w_why = st.text_input("2. Why (Por que será feito? / Justificativa):", placeholder="Ex: Corrigir desvio dimensional na peça")
-            w_where = st.text_input("3. Where (Onde será aplicado?):", placeholder="Ex: Posto de Injeção - Linha CAB 1")
+            w_what = st.text_input("1. What (Ação Corretiva):", placeholder="Pode ser preenchido posteriormente")
+            w_why = st.text_input("2. Why (Justificativa):", placeholder="Pode ser preenchido posteriormente")
+            w_where = st.text_input("3. Where (Local):", placeholder="Pode ser preenchido posteriormente")
         with col_5w2:
-            w_when = st.text_input("4. When (Quando? / Prazo limite):", placeholder="Ex: Imediato / 24 horas")
-            w_who = st.text_input("5. Who (Quem executará?):", placeholder="Ex: Técnico de Processo / Manutenção")
-            w_how = st.text_input("6. How (Como será feito? / Método):", placeholder="Ex: Conforme procedimento operacional padrão")
+            w_when = st.text_input("4. When (Prazo limite):", placeholder="Pode ser preenchido posteriormente")
+            w_who = st.text_input("5. Who (Quem executará):", placeholder="Pode ser preenchido posteriormente")
+            w_how = st.text_input("6. How (Método):", placeholder="Pode ser preenchido posteriormente")
 
         status_tratativa = st.selectbox("Status da Tratativa:", ["Pendente Ação Corretiva", "Em Andamento (5W1H)", "Concluído & Validado"])
         
-        btn_enviar_anomalia = st.form_submit_button("Salvar Ocorrência, Plano 5W1H e Enviar E-mail")
+        btn_enviar_anomalia = st.form_submit_button("Salvar Ocorrência e Disparar E-mail Imediato")
         
         if btn_enviar_anomalia:
             if not a_problema.strip():
-                st.warning("Por favor, descreva o problema antes de salvar.")
+                st.warning("Por favor, descreva o problema antes de salvar a ocorrência.")
             else:
                 novo_reg_anom = {
                     "Data": a_data.strftime("%d/%m/%Y"),
@@ -280,12 +280,12 @@ with aba_anomalias:
                     "Responsável": a_responsavel_cargo,
                     "E-mail Destino": a_email_destino,
                     "Problema": a_problema,
-                    "What (Ação)": w_what,
-                    "Why (Por que)": w_why,
-                    "Where (Onde)": w_where,
-                    "When (Quando)": w_when,
-                    "Who (Quem)": w_who,
-                    "How (Como)": w_how,
+                    "What (Ação)": w_what if w_what.strip() else "Não informado na abertura",
+                    "Why (Por que)": w_why if w_why.strip() else "Não informado na abertura",
+                    "Where (Onde)": w_where if w_where.strip() else "Não informado na abertura",
+                    "When (Quando)": w_when if w_when.strip() else "Não informado na abertura",
+                    "Who (Quem)": w_who if w_who.strip() else "Não informado na abertura",
+                    "How (Como)": w_how if w_how.strip() else "Não informado na abertura",
                     "Status": status_tratativa
                 }
                 arq_anomalias = "Log_Registro_Anomalias.xlsx"
@@ -305,24 +305,24 @@ with aba_anomalias:
                     msg = MIMEMultipart()
                     msg['From'] = remetente_email
                     msg['To'] = a_email_destino
-                    msg['Subject'] = f"[ALERTA PU 4.0 - 5W1H] Não Conformidade em {a_maquina}"
+                    msg['Subject'] = f"[ALERTA PU 4.0 - OCORRÊNCIA] Não Conformidade em {a_maquina}"
                     
                     corpo_email = f"""
                     Prezado(a) {a_responsavel_cargo},
                     
-                    Uma não conformidade foi registrada no sistema ARIAM PU Control 4.0 e requer acompanhamento técnico:
+                    Uma nova ocorrência foi aberta no sistema ARIAM PU Control 4.0 e requer sua atenção:
                     
                     - Data/Hora: {a_data.strftime('%d/%m/%Y')} às {a_hora}
                     - Máquina Afetada: {a_maquina}
                     - Descrição do Problema: {a_problema}
                     
-                    PLANO DE AÇÃO 5W1H INFORMADO:
-                    - What (Ação): {w_what}
-                    - Why (Motivo): {w_why}
-                    - Where (Local): {w_where}
-                    - When (Prazo): {w_when}
-                    - Who (Responsável): {w_who}
-                    - How (Método): {w_how}
+                    PLANO DE AÇÃO 5W1H (Parcial / Acompanhamento):
+                    - What (Ação): {novo_reg_anom['What (Ação)']}
+                    - Why (Motivo): {novo_reg_anom['Why (Por que)']}
+                    - Where (Local): {novo_reg_anom['Where (Onde)']}
+                    - When (Prazo): {novo_reg_anom['When (Quando)']}
+                    - Who (Responsável): {novo_reg_anom['Who (Quem)']}
+                    - How (Método): {novo_reg_anom['How (Como)']}
                     - Status Atual: {status_tratativa}
                     
                     Atenciosamente,
@@ -336,13 +336,13 @@ with aba_anomalias:
                     server.sendmail(remetente_email, a_email_destino, msg.as_string())
                     server.quit()
                     
-                    st.success(f"Ocorrência salva e e-mail disparado com sucesso para **{a_email_destino}**!")
+                    st.success(f"Ocorrência salva e e-mail de alerta disparado com sucesso para **{a_email_destino}**!")
                 except Exception as ex:
-                    st.warning(f"Ocorrência salva na planilha, mas houve falha no envio do e-mail: {ex}")
+                    st.warning(f"Ocorrência salva com sucesso na planilha, mas houve falha no envio do e-mail: {ex}")
 
     if os.path.exists("Log_Registro_Anomalias.xlsx"):
         st.markdown("---")
-        st.markdown("### 📊 Histórico Geral de Anomalias & Planos 5W1H")
+        st.markdown("### 📊 Histórico Geral de Ocorrências & Planos 5W1H")
         st.dataframe(pd.read_excel("Log_Registro_Anomalias.xlsx"))
 
 st.markdown("---")
