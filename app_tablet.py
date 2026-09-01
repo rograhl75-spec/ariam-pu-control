@@ -20,7 +20,7 @@ with col_titulo:
 
 st.markdown("---")
 
-# GARANTIR QUE O RELATÓRIO EXCEL EXISTA (Executa o ETL se necessário)
+# GARANTIR QUE O RELATÓRIO EXCEL EXISTA
 if not os.path.exists("Relatorio_Processo_Injecao_Atualizado.xlsx"):
     try:
         import automacao_grahl
@@ -54,25 +54,20 @@ except Exception as e:
     st.error(f"Erro ao ler a planilha de dados: {e}")
     st.stop()
 
-# Normalizar cabeçalhos
 df_base.columns = [str(c).strip() for c in df_base.columns]
 
-# LEITURA DIRETA DOS CAMPOS GERADOS PELO ETL:
 df_base['Expositor_Filtro'] = df_base['Expositor'].fillna("GERAL").astype(str).str.strip()
 df_base['Componente_Filtro'] = df_base['Componente'].fillna("GERAL").astype(str).str.strip()
 df_base['Codigo_Item_Filtro'] = df_base['Codigo_Item'].fillna("0000").astype(str).str.strip()
 df_base['Descricao_Filtro'] = df_base['Descricao'].fillna("").astype(str).str.strip()
-
-# Item (Código) + Descrição unificados para o filtro 4
 df_base['Item_Descricao_Completo'] = df_base['Codigo_Item_Filtro'] + " — " + df_base['Descricao_Filtro']
-
-# Máquina / Injetora
 df_base['Maquina_Filtro'] = df_base['Maquina'].fillna("Krauss Maffei 40/40").astype(str).str.strip()
 
-aba_producao, aba_qualidade_pesagem, aba_qualidade_reatividade, aba_anomalias = st.tabs([
+aba_producao, aba_qualidade_pesagem, aba_qualidade_reatividade, aba_inspecao_semanal, aba_anomalias = st.tabs([
     "⚙️ Painel de Produção & Máquinas", 
     "⚖️ Controle de Pesagem (Campo)", 
     "🧪 Controle de Reatividade (DOC 0001/15)",
+    "📑 Inspeções Semanais & Relatórios",
     "⚠️ Registro de Anomalias & 5W1H"
 ])
 
@@ -230,7 +225,148 @@ with aba_qualidade_reatividade:
         st.markdown("### 📊 Histórico de Reatividade")
         st.dataframe(pd.read_excel("Log_Controle_Reatividade_DOC0001.xlsx"))
 
-# ABA 4: REGISTRO DE ANOMALIAS + ID DE PENDÊNCIA + VISUALIZADOR DETALHADO
+# ABA 4: INSPEÇÕES SEMANAIS & RELATÓRIO TÉCNICO PADRÃO ABNT SEPARADO POR MÁQUINA
+with aba_inspecao_semanal:
+    st.subheader("📑 Gestão de Inspeções Semanais & Relatório Técnico ABNT")
+    st.markdown("Realize a inspeção técnica selecionando a máquina específica (40/40 ou 80/80), adicione fotos da câmera e gere o laudo.")
+    
+    with st.form("form_inspecao_semana"):
+        st.markdown("### 1️⃣ Identificação da Auditoria & Seleção da Injetora")
+        c_insp1, c_insp2 = st.columns(2)
+        with c_insp1:
+            fuso_br = timezone(timedelta(hours=-3))
+            insp_data = st.date_input("Data da Inspeção", datetime.now(fuso_br).date())
+            insp_responsavel = st.text_input("Responsável Técnico", "Rogério Grahl — CREA SC 1039223-9")
+            
+        with c_insp2:
+            insp_semana = st.text_input("Semana de Referência / Período", "Semana 35 / 2026")
+            # SELEÇÃO SEPARADA DAS MÁQUINAS
+            insp_maquina = st.selectbox("Injetora / Cabeçote Alvo da Inspeção:", [
+                "Krauss Maffei 40/40 (Cabeçote 1)", 
+                "Krauss Maffei 80/80 (Cabeçote 2)"
+            ])
+
+        st.markdown("---")
+        st.markdown(f"### 2️⃣ Avaliação dos Pilares da Produção — {insp_maquina}")
+        
+        col_p1, col_p2 = st.columns(2)
+        with col_p1:
+            st.markdown("#### 🛠️ Manutenção & Equipamentos")
+            insp_manut_status = st.selectbox("Status Manutenção do Cabeçote:", ["Conforme", "Parcialmente Conforme", "Não Conforme"])
+            insp_manut_obs = st.text_area("Observações de Manutenção:", placeholder="Ex: Vazamentos, calibração de vazão, bicos...")
+            
+            st.markdown("#### ⚖️ Controle de Pesagem & Reatividade")
+            insp_peso_status = st.selectbox("Status Desvios de Pesagem:", ["Dentro da tolerância (±50g)", "Desvio Moderado", "Desvio Crítico (>100g)"])
+            insp_peso_obs = st.text_area("Observações de Pesagem:", placeholder="Ex: Análise das taras, médias de injeção...")
+
+        with col_p2:
+            st.markdown("#### 🔍 Qualidade de Espuma & Processo")
+            insp_qual_status = st.selectbox("Status Conformidade Físico-Estrutural:", ["Aprovado (NBR 8082)", "Alerta de Deformação", "Reprovado"])
+            insp_qual_obs = st.text_area("Observações de Qualidade:", placeholder="Ex: Células fechadas, retrabalhos, aderência...")
+            
+            st.markdown("#### 🦺 Segurança Operacional & Meio Ambiente")
+            insp_seg_status = st.selectbox("Status EPIs, Ventilação e Ciclopentano (HC):", ["Conforme", "Advertência", "Paralisação Recomendada"])
+            insp_seg_obs = st.text_area("Observações de Segurança:", placeholder="Ex: Exaustão ativa, detectores de gás, EPIs...")
+
+        st.markdown("---")
+        st.markdown("### 3️⃣ Captura de Evidências Fotográficas & Conclusão")
+        
+        # CAPTURA DE FOTO DIRETO DA CÂMERA DO TABLET OU UPLOAD
+        st.markdown("📸 **Capturar Foto do Local / Equipamento:**")
+        foto_capturada = st.camera_input("Tirar foto com a câmera do tablet")
+        
+        insp_fotos_desc = st.text_area("Registro Descritivo das Evidências Visuais:", placeholder="Descreva os pontos inspecionados visualmente...")
+        insp_conclusao = st.text_area("Conclusão Executiva & Recomendações Técnicas:", placeholder="Diretrizes gerais para a gestão desta máquina...")
+
+        btn_gerar_relatorio = st.form_submit_button("Gerar Relatório Técnico Padronizado (ABNT)")
+
+        if btn_gerar_relatorio:
+            # Tratamento da imagem capturada para exibição no HTML do relatório
+            img_html_tag = ""
+            if foto_capturada is not None:
+                import base64
+                bytes_data = foto_capturada.getvalue()
+                base64_str = base64.b64encode(bytes_data).decode("utf-8")
+                img_html_tag = f'<div style="text-align: center; margin: 15px 0;"><img src="data:image/jpeg;base64,{base64_str}" style="max-width: 100%; height: auto; border: 1px solid #ccc; border-radius: 4px;"/><p style="font-size: 11px; color: #555;">Figura 1 - Evidência Fotográfica Capturada em Campo ({insp_maquina})</p></div>'
+
+            html_relatorio = f"""
+            <div style="font-family: Arial, sans-serif; padding: 25px; border: 1px solid #ccc; background-color: #fafafa; color: #000;">
+                <div style="text-align: center; border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 20px;">
+                    <h2 style="margin: 0; color: #111;">GRAHL CONSULTORIA E TREINAMENTOS</h2>
+                    <p style="margin: 5px 0; font-size: 14px; color: #555;">Gestão de Injeção, Reologia e Qualidade em Poliuretano</p>
+                    <h3 style="margin-top: 15px; color: #222;">RELATÓRIO TÉCNICO DE INSPEÇÃO SEMANAL</h3>
+                    <p style="margin: 5px 0; font-size: 15px; font-weight: bold; color: #0056b3;">{insp_maquina}</p>
+                </div>
+                
+                <table style="width: 100%; font-size: 13px; margin-bottom: 20px; border-collapse: collapse;">
+                    <tr>
+                        <td style="padding: 6px; border: 1px solid #ddd;"><strong>Período:</strong> {insp_semana}</td>
+                        <td style="padding: 6px; border: 1px solid #ddd;"><strong>Data da Emissão:</strong> {insp_data.strftime('%d/%m/%Y')}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 6px; border: 1px solid #ddd;"><strong>Injetora Alvo:</strong> {insp_maquina}</td>
+                        <td style="padding: 6px; border: 1px solid #ddd;"><strong>Responsável:</strong> {insp_responsavel}</td>
+                    </tr>
+                </table>
+
+                <h4 style="color: #333; border-left: 4px solid #0056b3; padding-left: 8px;">1. SUMÁRIO EXECUTIVO</h4>
+                <p style="font-size: 13px; line-height: 1.5;">O presente relatório consolida a auditoria técnica semanal realizada na linha de injeção <strong>{insp_maquina}</strong>, contemplando verificação de reatividade, desvios de massa/pesagem, integridade mecânica e conformidade regulamentar.</p>
+
+                <h4 style="color: #333; border-left: 4px solid #0056b3; padding-left: 8px;">2. PARECER DOS PILARES OPERACIONAIS</h4>
+                <table style="width: 100%; font-size: 13px; border-collapse: collapse; margin-bottom: 20px;">
+                    <tr style="background-color: #eaeaea;">
+                        <th style="padding: 8px; border: 1px solid #ccc; text-align: left;">Pilar de Avaliação</th>
+                        <th style="padding: 8px; border: 1px solid #ccc; text-align: left;">Status</th>
+                        <th style="padding: 8px; border: 1px solid #ccc; text-align: left;">Apontamentos de Campo</th>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ccc;"><strong>Manutenção</strong></td>
+                        <td style="padding: 8px; border: 1px solid #ccc;">{insp_manut_status}</td>
+                        <td style="padding: 8px; border: 1px solid #ccc;">{insp_manut_obs}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ccc;"><strong>Pesagem / Reatividade</strong></td>
+                        <td style="padding: 8px; border: 1px solid #ccc;">{insp_peso_status}</td>
+                        <td style="padding: 8px; border: 1px solid #ccc;">{insp_peso_obs}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ccc;"><strong>Qualidade Estrutural</strong></td>
+                        <td style="padding: 8px; border: 1px solid #ccc;">{insp_qual_status}</td>
+                        <td style="padding: 8px; border: 1px solid #ccc;">{insp_qual_obs}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ccc;"><strong>Segurança & HC</strong></td>
+                        <td style="padding: 8px; border: 1px solid #ccc;">{insp_seg_status}</td>
+                        <td style="padding: 8px; border: 1px solid #ccc;">{insp_seg_obs}</td>
+                    </tr>
+                </table>
+
+                <h4 style="color: #333; border-left: 4px solid #0056b3; padding-left: 8px;">3. EVIDÊNCIAS FOTOGRÁFICAS</h4>
+                {img_html_tag}
+                <p style="font-size: 13px; line-height: 1.5; background: #fff; padding: 10px; border: 1px dashed #ccc;">{insp_fotos_desc}</p>
+
+                <h4 style="color: #333; border-left: 4px solid #0056b3; padding-left: 8px;">4. CONCLUSÃO E RECOMENDAÇÕES</h4>
+                <p style="font-size: 13px; line-height: 1.5; background: #fff; padding: 10px; border: 1px dashed #ccc;">{insp_conclusao}</p>
+
+                <div style="margin-top: 30px; text-align: center; font-size: 12px; color: #777; border-top: 1px solid #ddd; padding-top: 10px;">
+                    Documento gerado eletronicamente via <strong>ARIAM PU 4.0</strong> — Grahl Consultoria e Treinamentos.
+                </div>
+            </div>
+            """
+            
+            st.success(f"Relatório técnico para **{insp_maquina}** gerado com sucesso!")
+            st.markdown("---")
+            st.markdown("### 📄 Visualização do Laudo Técnico (Padrão ABNT)")
+            st.markdown(html_relatorio, unsafe_allow_html=True)
+            
+            st.download_button(
+                label="📥 Baixar Relatório Técnico (.html / Word)",
+                data=html_relatorio,
+                file_name=f"Relatorio_Inspecao_{insp_semana.replace(' ', '_')}_{'40_40' if '40/40' in insp_maquina else '80_80'}.html",
+                mime="text/html"
+            )
+
+# ABA 5: REGISTRO DE ANOMALIAS + ID DE PENDÊNCIA + VISUALIZADOR DETALHADO
 with aba_anomalias:
     st.subheader("⚠️ Registro de Anomalias & Abertura de Ocorrência")
     st.markdown("Registre a não conformidade. Um número de ID (Pendência) será gerado automaticamente.")
@@ -251,7 +387,7 @@ with aba_anomalias:
         with col_a1:
             fuso_br = timezone(timedelta(hours=-3))
             data_atual_br = datetime.now(fuso_br).date()
-            a_data = st.date_input("Data da Ocorrência", data_atual_br)
+            a_data = st.date_input("Data da Ocorrência", data_atual_br, key="anom_data")
             a_maquina = st.selectbox("Injetora / Máquina Afetada", df_base['Maquina_Filtro'].unique().tolist())
         with col_a2:
             resp_selecionado = st.selectbox("Direcionar para o Responsável:", list(agenda_emails.keys()))
@@ -283,7 +419,6 @@ with aba_anomalias:
             else:
                 arq_anomalias = "Log_Registro_Anomalias.xlsx"
                 
-                # Gera ID sequencial da pendência (ex: OC-001, OC-002...)
                 try:
                     df_temp_id = pd.read_excel(arq_anomalias)
                     proximo_id = f"OC-{len(df_temp_id) + 1:03d}"
@@ -362,18 +497,15 @@ with aba_anomalias:
                 except Exception as ex:
                     st.warning(f"Ocorrência {proximo_id} salva com sucesso na planilha, mas houve falha no envio do e-mail: {ex}")
 
-    # HISTÓRICO LIMPO E VISUALIZADOR DETALHADO POR ID
     if os.path.exists("Log_Registro_Anomalias.xlsx"):
         st.markdown("---")
         st.markdown("### 📊 Histórico Geral de Ocorrências & Pendências")
         df_hist = pd.read_excel("Log_Registro_Anomalias.xlsx")
         
-        # Garante coluna ID para registros antigos que não tinham
         if 'ID' not in df_hist.columns:
             df_hist.insert(0, 'ID', [f"OC-{i+1:03d}" for i in range(len(df_hist))])
             df_hist.to_excel("Log_Registro_Anomalias.xlsx", index=False)
             
-        # Exibe uma tabela resumida e limpa (sem espremer o texto do problema)
         colunas_resumo = ['ID', 'Data', 'Hora', 'Máquina', 'Responsável', 'Status']
         st.dataframe(df_hist[colunas_resumo], use_container_width=True)
         
