@@ -225,13 +225,19 @@ with aba_qualidade_reatividade:
         st.markdown("### 📊 Histórico de Reatividade")
         st.dataframe(pd.read_excel("Log_Controle_Reatividade_DOC0001.xlsx"))
 
-# ABA 4: INSPEÇÕES SEMANAIS & RELATÓRIO TÉCNICO PADRÃO ABNT SEPARADO POR MÁQUINA
+# ABA 4: INSPEÇÕES SEMANAIS & RELATÓRIO TÉCNICO COM UPLOAD FLEXÍVEL DE FOTO (CÂMERA TRASEIRA OU GALERIA)
 with aba_inspecao_semanal:
     st.subheader("📑 Gestão de Inspeções Semanais & Relatório Técnico ABNT")
-    st.markdown("Realize a inspeção técnica selecionando a máquina específica (40/40 ou 80/80), adicione fotos da câmera e gere o laudo.")
+    st.markdown("Realize a inspeção técnica selecionando a máquina específica abaixo, adicione fotos e gere o laudo.")
+    
+    st.markdown("### 1️⃣ Seleção da Injetora Alvo")
+    insp_maquina = st.selectbox("Injetora / Cabeçote Alvo da Inspeção:", [
+        "Krauss Maffei 40/40 (Cabeçote 1)", 
+        "Krauss Maffei 80/80 (Cabeçote 2)"
+    ])
     
     with st.form("form_inspecao_semana"):
-        st.markdown("### 1️⃣ Identificação da Auditoria & Seleção da Injetora")
+        st.markdown("### 2️⃣ Identificação da Auditoria")
         c_insp1, c_insp2 = st.columns(2)
         with c_insp1:
             fuso_br = timezone(timedelta(hours=-3))
@@ -240,14 +246,9 @@ with aba_inspecao_semanal:
             
         with c_insp2:
             insp_semana = st.text_input("Semana de Referência / Período", "Semana 35 / 2026")
-            # SELEÇÃO SEPARADA DAS MÁQUINAS
-            insp_maquina = st.selectbox("Injetora / Cabeçote Alvo da Inspeção:", [
-                "Krauss Maffei 40/40 (Cabeçote 1)", 
-                "Krauss Maffei 80/80 (Cabeçote 2)"
-            ])
 
         st.markdown("---")
-        st.markdown(f"### 2️⃣ Avaliação dos Pilares da Produção — {insp_maquina}")
+        st.markdown(f"### 3️⃣ Avaliação dos Pilares da Produção — {insp_maquina}")
         
         col_p1, col_p2 = st.columns(2)
         with col_p1:
@@ -269,11 +270,10 @@ with aba_inspecao_semanal:
             insp_seg_obs = st.text_area("Observações de Segurança:", placeholder="Ex: Exaustão ativa, detectores de gás, EPIs...")
 
         st.markdown("---")
-        st.markdown("### 3️⃣ Captura de Evidências Fotográficas & Conclusão")
+        st.markdown("### 4️⃣ Anexo de Evidência Fotográfica & Conclusão")
         
-        # CAPTURA DE FOTO DIRETO DA CÂMERA DO TABLET OU UPLOAD
-        st.markdown("📸 **Capturar Foto do Local / Equipamento:**")
-        foto_capturada = st.camera_input("Tirar foto com a câmera do tablet")
+        # UPLOADFLEXÍVEL: Permite tirar foto com a câmera traseira do tablet ou escolher da galeria
+        foto_enviada = st.file_uploader("📸 Enviar Foto do Local / Equipamento (Usa a câmera traseira ou galeria)", type=["jpg", "jpeg", "png"])
         
         insp_fotos_desc = st.text_area("Registro Descritivo das Evidências Visuais:", placeholder="Descreva os pontos inspecionados visualmente...")
         insp_conclusao = st.text_area("Conclusão Executiva & Recomendações Técnicas:", placeholder="Diretrizes gerais para a gestão desta máquina...")
@@ -281,13 +281,12 @@ with aba_inspecao_semanal:
         btn_gerar_relatorio = st.form_submit_button("Gerar Relatório Técnico Padronizado (ABNT)")
 
         if btn_gerar_relatorio:
-            # Tratamento da imagem capturada para exibição no HTML do relatório
             img_html_tag = ""
-            if foto_capturada is not None:
+            if foto_enviada is not None:
                 import base64
-                bytes_data = foto_capturada.getvalue()
+                bytes_data = foto_enviada.getvalue()
                 base64_str = base64.b64encode(bytes_data).decode("utf-8")
-                img_html_tag = f'<div style="text-align: center; margin: 15px 0;"><img src="data:image/jpeg;base64,{base64_str}" style="max-width: 100%; height: auto; border: 1px solid #ccc; border-radius: 4px;"/><p style="font-size: 11px; color: #555;">Figura 1 - Evidência Fotográfica Capturada em Campo ({insp_maquina})</p></div>'
+                img_html_tag = f'<div style="text-align: center; margin: 15px 0;"><img src="data:image/jpeg;base64,{base64_str}" style="max-width: 100%; height: auto; border: 1px solid #ccc; border-radius: 4px;"/><p style="font-size: 11px; color: #555;">Figura 1 - Evidência Fotográfica em Campo ({insp_maquina})</p></div>'
 
             html_relatorio = f"""
             <div style="font-family: Arial, sans-serif; padding: 25px; border: 1px solid #ccc; background-color: #fafafa; color: #000;">
@@ -507,7 +506,7 @@ with aba_anomalias:
             df_hist.to_excel("Log_Registro_Anomalias.xlsx", index=False)
             
         colunas_resumo = ['ID', 'Data', 'Hora', 'Máquina', 'Responsável', 'Status']
-        st.dataframe(df_hist[colunas_resumo], use_container_width=True)
+        st.dataframe(df_hist[colunas_resumo], width='stretch')
         
         st.markdown("#### 🔍 Detalhes da Ocorrência & Plano 5W1H")
         lista_ids = df_hist['ID'].tolist()
