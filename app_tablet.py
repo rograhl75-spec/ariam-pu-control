@@ -533,7 +533,6 @@ with aba_anomalias:
                 st.write(f"**Status Atual:** {registro_detalhe['Status']}")
 
 st.markdown("---")
-=======
 import os
 import streamlit as st
 import pandas as pd
