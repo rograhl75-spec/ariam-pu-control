@@ -1068,5 +1068,5 @@ with aba_anomalias:
                 st.write(f"**Status Atual:** {registro_detalhe['Status']}")
 
 st.markdown("---")
->>>>>>> 458b589ff3dac91b5ee174898462e3bb4591b766
+458b589ff3dac91b5ee174898462e3bb4591b766
 st.caption("Grahl Consultoria e Treinamentos — Tecnologia aplicada ao chão de fábrica.")
