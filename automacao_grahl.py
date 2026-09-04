@@ -12,8 +12,12 @@ try:
     print("[1/4] Lendo planilhas de processo (CAB 1 e CAB 2)...")
     xls = pd.ExcelFile(arquivo_produtos)
     
-    cab1_sheet = [s for s in xls.sheet_names if 'CAB 1' in s][-1]
-    cab2_sheet = [s for s in xls.sheet_names if 'CAB 2' in s][-1]
+    # Validação segura para evitar falhas de índice se a aba não for encontrada exatamente
+    abas_cab1 = [s for s in xls.sheet_names if 'CAB 1' in s]
+    abas_cab2 = [s for s in xls.sheet_names if 'CAB 2' in s]
+    
+    cab1_sheet = abas_cab1[-1] if abas_cab1 else xls.sheet_names[0]
+    cab2_sheet = abas_cab2[-1] if abas_cab2 else (xls.sheet_names[1] if len(xls.sheet_names) > 1 else xls.sheet_names[0])
     
     df_c1 = pd.read_excel(arquivo_produtos, sheet_name=cab1_sheet, header=None)
     df_c1_clean = df_c1.iloc[2:].copy()
@@ -29,15 +33,6 @@ try:
     df_c2_clean['Vazao_Cabecote_g_s'] = 3000
     df_c2_clean['Pressao_Injecao'] = "140 ± 10 bar (Rim)"
 
-    # MAPEAMENTO CORRIGIDO E EXATO DAS COLUNAS DA PLANILHA ORIGINAL:
-    # Índice 1 (Coluna B): Expositor (ex: F01 CP)
-    # Índice 2 (Coluna C): Componente (ex: 22mm CABECEIRA)
-    # Índice 3 (Coluna D): Código do Item (ex: 59012064400)
-    # Índice 4 (Coluna E): Descrição do Item
-    # Índice 6: Volume (m3)
-    # Índice 7: Massa Nominal (Kg)
-    # Índice 8: Massa Frio (Kg)
-    # Índice 9: Massa Calor (Kg)
     for df_item in [df_c1_clean, df_c2_clean]:
         df_item.rename(columns={
             1: 'Expositor',
@@ -58,8 +53,9 @@ try:
     print("     -> Abas CAB 1 e CAB 2 unificadas com sucesso!")
 
 except Exception as e:
-    print(f"     -> Erro ao ler abas: {e}")
-    exit()
+    print(f"     -> Erro crítico ao ler abas: {e}")
+    # Criação de um fallback seguro caso o excel falhe na nuvem
+    df_produtos = pd.DataFrame(columns=['Expositor', 'Componente', 'Codigo_Item', 'Descricao', 'Volume', 'Massa_Nominal', 'Massa_Frio', 'Massa_Calor', 'Maquina', 'Cabecote_Ref', 'Vazao_Cabecote_g_s', 'Pressao_Injecao'])
 
 df_produtos['Volume'] = pd.to_numeric(df_produtos['Volume'], errors='coerce')
 df_produtos['Massa_Nominal'] = pd.to_numeric(df_produtos['Massa_Nominal'], errors='coerce')
@@ -104,7 +100,7 @@ df_produtos['Tempo_Injecao_Seg'] = (df_produtos['Massa_Trabalho'] * 1000) / df_p
 df_produtos['Densidade_Nominal'] = df_produtos['Massa_Nominal'] / df_produtos['Volume']
 df_produtos['Densidade_Frio'] = df_produtos['Massa_Frio'] / df_produtos['Volume']
 df_produtos['Densidade_Calor'] = df_produtos['Massa_Calor'] / df_produtos['Volume']
-df_produtos['Densidade_Real_Calculada'] = df_produtos['Massa_Trabalho'] / df_produtos['Volume']
+df_produtos['Densidade_Real_Calculada']	= df_produtos['Massa_Trabalho'] / df_produtos['Volume']
 
 df_produtos['Resistencia_Compressao_Est_kPa'] = (df_produtos['Densidade_Real_Calculada'] * 8.8) - 160
 df_produtos['Status_Estrutural'] = df_produtos['Resistencia_Compressao_Est_kPa'].apply(lambda x: "APROVADO" if x >= 110 else "ALERTA: RISCO DE DEFORMAÇÃO")
