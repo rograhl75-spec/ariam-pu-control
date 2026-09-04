@@ -19,6 +19,12 @@ try:
 except ImportError:
     DOCX_DISPONIVEL = False
 
+try:
+    import matplotlib.pyplot as plt
+    MATPLOTLIB_DISPONIVEL = True
+except ImportError:
+    MATPLOTLIB_DISPONIVEL = False
+
 st.set_page_config(page_title="Grahl PU Control 4.0", page_icon="🏭", layout="wide")
 
 def verificar_senha():
@@ -207,6 +213,7 @@ def voltar_ao_menu():
 if st.session_state["menu_ativo"] == "home":
     st.markdown("<h2 style='text-align: center; color: #1F4E78;'>Painel Executivo de Controle de Processos</h2>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; color: #555; margin-bottom: 25px;'>Selecione o módulo operacional desejado abaixo:</p>", unsafe_allow_html=True)
+    
     col_c1, col_c2, col_c3 = st.columns(3)
     with col_c1:
         st.markdown("""
@@ -221,6 +228,7 @@ if st.session_state["menu_ativo"] == "home":
         if st.button("Acessar Produção", use_container_width=True):
             st.session_state["menu_ativo"] = "producao"
             st.rerun()
+            
     with col_c2:
         st.markdown("""
         <div style="background-color: #f8f9fa; border: 2px solid #1F4E78; border-radius: 10px; padding: 18px; text-align: center; height: 175px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 3px 5px rgba(0,0,0,0.04); margin-bottom: 10px;">
@@ -234,6 +242,7 @@ if st.session_state["menu_ativo"] == "home":
         if st.button("Acessar Pesagem", use_container_width=True):
             st.session_state["menu_ativo"] = "pesagem"
             st.rerun()
+            
     with col_c3:
         st.markdown("""
         <div style="background-color: #f8f9fa; border: 2px solid #1F4E78; border-radius: 10px; padding: 18px; text-align: center; height: 175px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 3px 5px rgba(0,0,0,0.04); margin-bottom: 10px;">
@@ -248,9 +257,22 @@ if st.session_state["menu_ativo"] == "home":
             st.session_state["menu_ativo"] = "reatividade"
             st.rerun()
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    col_c4, col_c5 = st.columns(2)
+    col_c4, col_c5, col_c6 = st.columns(3)
     with col_c4:
+        st.markdown("""
+        <div style="background-color: #f8f9fa; border: 2px solid #1F4E78; border-radius: 10px; padding: 18px; text-align: center; height: 175px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 3px 5px rgba(0,0,0,0.04); margin-bottom: 10px;">
+            <div>
+                <div style="font-size: 32px; margin-bottom: 6px;">🌡️</div>
+                <h3 style="color: #1F4E78; margin: 0 0 6px 0; font-size: 16px;">Controle Térmico</h3>
+                <p style="font-size: 12px; color: #666; margin: 0; line-height: 1.3;">Temperaturas diárias de moldes e estufas com gráficos e laudo Word.</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Acessar Térmico", use_container_width=True):
+            st.session_state["menu_ativo"] = "termico"
+            st.rerun()
+            
+    with col_c5:
         st.markdown("""
         <div style="background-color: #f8f9fa; border: 2px solid #1F4E78; border-radius: 10px; padding: 18px; text-align: center; height: 175px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 3px 5px rgba(0,0,0,0.04); margin-bottom: 10px;">
             <div>
@@ -263,7 +285,8 @@ if st.session_state["menu_ativo"] == "home":
         if st.button("Acessar Inspeções", use_container_width=True):
             st.session_state["menu_ativo"] = "inspecoes"
             st.rerun()
-    with col_c5:
+            
+    with col_c6:
         st.markdown("""
         <div style="background-color: #f8f9fa; border: 2px solid #1F4E78; border-radius: 10px; padding: 18px; text-align: center; height: 175px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 3px 5px rgba(0,0,0,0.04); margin-bottom: 10px;">
             <div>
@@ -490,6 +513,199 @@ else:
                     file_name="Relatorio_Reatividade_DOC0001.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     key="btn_down_reat"
+                )
+
+    elif st.session_state["menu_ativo"] == "termico":
+        st.subheader("🌡️ Controle Térmico Diário (Moldes & Estufas)")
+        st.markdown("Registre as temperaturas informadas pela qualidade (Moldes e Estufas). Um ID único será gerado para cada medição.")
+
+        with st.form("form_controle_termico"):
+            fuso_br = timezone(timedelta(hours=-3))
+            t_data = st.date_input("Data da Medição", datetime.now(fuso_br).date(), key="term_data")
+            t_resp = st.text_input("Responsável / Informante", "Maicon Henrique Reis / Rogério Grahl")
+
+            st.markdown("---")
+            st.markdown("### 1️⃣ Temperaturas dos Moldes (°C)")
+            col_m1, col_m2, col_m3 = st.columns(3)
+            with col_m1:
+                st.markdown("**Skin M1**")
+                m1_fundo = st.number_input("M1 Fundo", value=44.0, key="m1_f")
+                m1_parede = st.number_input("M1 Parede", value=42.0, key="m1_p")
+                m1_coracao = st.number_input("M1 Coração", value=41.0, key="m1_c")
+            with col_m2:
+                st.markdown("**Skin M2**")
+                m2_fundo = st.number_input("M2 Fundo", value=44.0, key="m2_f")
+                m2_parede = st.number_input("M2 Parede", value=42.0, key="m2_p")
+                m2_coracao = st.number_input("M2 Coração", value=37.0, key="m2_c")
+            with col_m3:
+                st.markdown("**Skin M3**")
+                m3_fundo = st.number_input("M3 Fundo", value=45.0, key="m3_f")
+                m3_parede = st.number_input("M3 Parede", value=44.0, key="m3_p")
+                m3_coracao = st.number_input("M3 Coração", value=42.0, key="m3_c")
+
+            col_rfg1, col_rfg2 = st.columns(2)
+            with col_rfg1:
+                st.markdown("**RFG — Molde Tanque 4**")
+                rfg4_fundo = st.number_input("Tanque 4 Fundo", value=37.0, key="r4_f")
+                rfg4_parede = st.number_input("Tanque 4 Parede", value=37.0, key="r4_p")
+                rfg4_coracao = st.number_input("Tanque 4 Coração", value=36.0, key="r4_c")
+            with col_rfg2:
+                st.markdown("**RFG — Molde Tanque 5 (Maior)**")
+                rfg5_fundo = st.number_input("Tanque 5 Fundo", value=37.0, key="r5_f")
+                rfg5_parede = st.number_input("Tanque 5 Parede", value=37.0, key="r5_p")
+                rfg5_coracao = st.number_input("Tanque 5 Coração", value=39.0, key="r5_c")
+
+            col_pnl1, col_pnl2 = st.columns(2)
+            with col_pnl1:
+                st.markdown("**Painel 1**")
+                pnl1_fundo = st.number_input("Painel 1 Fundo (Acrílico)", value=38.0, key="p1_f")
+                pnl1_tampa = st.number_input("Painel 1 Tampa", value=40.0, key="p1_t")
+            with col_pnl2:
+                st.markdown("**Painel 2**")
+                pnl2_fundo = st.number_input("Painel 2 Fundo (Acrílico)", value=37.0, key="p2_f")
+                pnl2_tampa = st.number_input("Painel 2 Tampa", value=40.0, key="p2_t")
+
+            st.markdown("---")
+            st.markdown("### 2️⃣ Temperaturas de Estufas (°C)")
+            col_est1, col_est2 = st.columns(2)
+            with col_est1:
+                est_cabecira = st.number_input("Cabeceira", value=41.0, key="est_cab")
+                est_tanque = st.number_input("Tanque", value=41.0, key="est_tan")
+            with col_est2:
+                est_ilha_int = st.number_input("Ilha Interna", value=30.0, key="est_int")
+                est_ilha_ext = st.number_input("Ilha Externa", value=27.0, key="est_ext")
+
+            btn_salvar_termico = st.form_submit_button("Salvar Medição Térmica no Banco de Dados")
+            if btn_salvar_termico:
+                arq_db_term = "Log_Controle_Termico_Moldes.xlsx"
+                try:
+                    df_term_db = pd.read_excel(arq_db_term)
+                    prox_id_term = f"TR-{len(df_term_db) + 1:03d}"
+                except:
+                    df_term_db = pd.DataFrame()
+                    prox_id_term = "TR-001"
+
+                novo_reg_term = {
+                    "ID": prox_id_term,
+                    "Data": t_data.strftime("%d/%m/%Y"),
+                    "Responsável": t_resp,
+                    "M1_Fundo": m1_fundo, "M1_Parede": m1_parede, "M1_Coração": m1_coracao,
+                    "M2_Fundo": m2_fundo, "M2_Parede": m2_parede, "M2_Coração": m2_coracao,
+                    "M3_Fundo": m3_fundo, "M3_Parede": m3_parede, "M3_Coração": m3_coracao,
+                    "T4_Fundo": rfg4_fundo, "T4_Parede": rfg4_parede, "T4_Coração": rfg4_coracao,
+                    "T5_Fundo": rfg5_fundo, "T5_Parede": rfg5_parede, "T5_Coração": rfg5_coracao,
+                    "P1_Fundo": pnl1_fundo, "P1_Tampa": pnl1_tampa,
+                    "P2_Fundo": pnl2_fundo, "P2_Tampa": pnl2_tampa,
+                    "Est_Cabeceira": est_cabecira, "Est_Tanque": est_tanque,
+                    "Est_Ilha_Int": est_ilha_int, "Est_Ilha_Ext": est_ilha_ext
+                }
+
+                df_term_db = pd.concat([df_term_db, pd.DataFrame([novo_reg_term])], ignore_index=True)
+                df_term_db.to_excel(arq_db_term, index=False)
+                st.success(f"Medição térmica **{prox_id_term}** salva com sucesso!")
+
+        if os.path.exists("Log_Controle_Termico_Moldes.xlsx"):
+            st.markdown("---")
+            st.markdown("### 🗄️ Histórico de Medições Térmicas")
+            df_term_hist = pd.read_excel("Log_Controle_Termico_Moldes.xlsx")
+            st.dataframe(df_term_hist, use_container_width=True)
+
+            id_term_escolhido = st.selectbox("Selecione o ID da Medição para gerar o Laudo Word com Gráfico:", df_term_hist['ID'].tolist(), key="select_id_term")
+            
+            if id_term_escolhido and DOCX_DISPONIVEL:
+                reg_t = df_term_hist[df_term_hist['ID'] == id_term_escolhido].iloc[0]
+
+                # Gerar gráfico com Matplotlib se disponível
+                caminho_grafico = "temp_chart_temp.png"
+                if MATPLOTLIB_DISPONIVEL:
+                    try:
+                        fig, ax = plt.subplots(figsize=(8, 4))
+                        moldes_nomes = ['M1 Cor.', 'M2 Cor.', 'M3 Cor.', 'T4 Cor.', 'T5 Cor.', 'P1 Fundo', 'P2 Fundo', 'Est. Cab.', 'Est. Tanq.', 'Est. Int.', 'Est. Ext.']
+                        moldes_vals = [reg_t['M1_Coração'], reg_t['M2_Coração'], reg_t['M3_Coração'], reg_t['T4_Coração'], reg_t['T5_Coração'], reg_t['P1_Fundo'], reg_t['P2_Fundo'], reg_t['Est_Cabeceira'], reg_t['Est_Tanque'], reg_t['Est_Ilha_Int'], reg_t['Est_Ilha_Ext']]
+                        
+                        ax.bar(moldes_nomes, moldes_vals, color='#1F4E78')
+                        ax.set_ylabel('Temperatura (°C)')
+                        ax.set_title(f'Perfil Térmico — Medição {reg_t["ID"]} ({reg_t["Data"]})')
+                        plt.xticks(rotation=45, ha='right')
+                        plt.tight_layout()
+                        plt.savefig(caminho_grafico, dpi=200)
+                        plt.close()
+                    except:
+                        pass
+
+                doc_t = Document()
+                aplicar_estilo_abadi_e_espacamento(doc_t)
+
+                p_ht = doc_t.add_paragraph()
+                p_ht.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                r_ht = p_ht.add_run("GRAHL CONSULTORIA E TREINAMENTOS\n")
+                r_ht.bold = True
+                r_ht.font.size = Pt(14)
+                r_ht.font.color.rgb = RGBColor(31, 78, 120)
+                r_subt = p_ht.add_run(f"Laudo Executivo de Controle Térmico — {reg_t['ID']}")
+                r_subt.font.size = Pt(11)
+
+                doc_t.add_paragraph()
+                t_meta_t = doc_t.add_table(rows=2, cols=2)
+                t_meta_t.cell(0, 0).text = f"Data da Medição: {limpar_valor(reg_t['Data'])}"
+                t_meta_t.cell(0, 1).text = f"Responsável: {limpar_valor(reg_t['Responsável'])}"
+                t_meta_t.cell(1, 0).text = f"ID do Registro: {limpar_valor(reg_t['ID'])}"
+                t_meta_t.cell(1, 1).text = "Status: Conforme Parâmetros de Processo"
+                formatar_tabela_profissional(t_meta_t, com_cabecalho=False)
+
+                doc_t.add_paragraph()
+                doc_t.add_heading("1. Resumo das Temperaturas Medidas", level=2)
+                
+                # Inserir imagem do gráfico se gerada
+                if MATPLOTLIB_DISPONIVEL and os.path.exists(caminho_grafico):
+                    try:
+                        doc_t.add_picture(caminho_grafico, width=Inches(5.5))
+                        doc_t.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    except:
+                        pass
+
+                doc_t.add_paragraph()
+                doc_t.add_heading("2. Tabela Analítica de Leituras", level=2)
+                
+                t_dados_t = doc_t.add_table(rows=12, cols=3)
+                h_ct = t_dados_t.rows[0].cells
+                h_ct[0].text = "Equipamento / Setor"
+                h_ct[1].text = "Componente / Seção"
+                h_ct[2].text = "Temperatura (°C)"
+
+                valores_tabela = [
+                    ("Skin M1", "Fundo / Parede / Coração", f"{reg_t['M1_Fundo']} / {reg_t['M1_Parede']} / {reg_t['M1_Coração']}"),
+                    ("Skin M2", "Fundo / Parede / Coração", f"{reg_t['M2_Fundo']} / {reg_t['M2_Parede']} / {reg_t['M2_Coração']}"),
+                    ("Skin M3", "Fundo / Parede / Coração", f"{reg_t['M3_Fundo']} / {reg_t['M3_Parede']} / {reg_t['M3_Coração']}"),
+                    ("RFG — Tanque 4", "Fundo / Parede / Coração", f"{reg_t['T4_Fundo']} / {reg_t['T4_Parede']} / {reg_t['T4_Coração']}"),
+                    ("RFG — Tanque 5", "Fundo / Parede / Coração", f"{reg_t['T5_Fundo']} / {reg_t['T5_Parede']} / {reg_t['T5_Coração']}"),
+                    ("Painel 1", "Fundo (Acrílico) / Tampa", f"{reg_t['P1_Fundo']} / {reg_t['P1_Tampa']}"),
+                    ("Painel 2", "Fundo (Acrílico) / Tampa", f"{reg_t['P2_Fundo']} / {reg_t['P2_Tampa']}"),
+                    ("Estufa Cabeceira", "Ambiente Interno", f"{reg_t['Est_Cabeceira']} °C"),
+                    ("Estufa Tanque", "Ambiente Interno", f"{reg_t['Est_Tanque']} °C"),
+                    ("Ilha Interna", "Ambiente", f"{reg_t['Est_Ilha_Int']} °C"),
+                    ("Ilha Externa", "Ambiente", f"{reg_t['Est_Ilha_Ext']} °C")
+                ]
+
+                for idx, (eqp, comp, val) in enumerate(valores_tabela):
+                    rc = t_dados_t.rows[idx + 1].cells
+                    rc[0].text = eqp
+                    rc[1].text = comp
+                    rc[2].text = val
+
+                formatar_tabela_profissional(t_dados_t, com_cabecalho=True)
+                adicionar_assinatura_padrao(doc_t, responsavel=limpar_valor(reg_t['Responsável']))
+
+                bio_term = io.BytesIO()
+                doc_t.save(bio_term)
+                bio_term.seek(0)
+
+                st.download_button(
+                    label=f"📥 Baixar Laudo Térmico com Gráfico ({reg_t['ID']}) .docx",
+                    data=bio_term.getvalue(),
+                    file_name=f"Laudo_Termico_{reg_t['ID']}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    key=f"btn_dl_term_{reg_t['ID']}"
                 )
 
     elif st.session_state["menu_ativo"] == "inspecoes":
@@ -858,7 +1074,7 @@ else:
                     t_5w_ind.cell(3, 1).text = limpar_valor(registro_detalhe['Where (Onde)'])
                     t_5w_ind.cell(4, 0).text = "4. When (Prazo Limite)"
                     t_5w_ind.cell(4, 1).text = limpar_valor(registro_detalhe['When (Quando)'])
-                    t_5w_ind.cell(5, 0).text(f"5. Who (Responsável Execução)")
+                    t_5w_ind.cell(5, 0).text = "5. Who (Responsável Execução)"
                     t_5w_ind.cell(5, 1).text = limpar_valor(registro_detalhe['Who (Quem)'])
                     t_5w_ind.cell(6, 0).text = "6. How (Método)"
                     t_5w_ind.cell(6, 1).text = limpar_valor(registro_detalhe['How (Como)'])
