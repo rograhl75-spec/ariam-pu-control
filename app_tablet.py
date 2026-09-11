@@ -615,7 +615,6 @@ else:
             if id_term_escolhido and DOCX_DISPONIVEL:
                 reg_t = df_term_hist[df_term_hist['ID'] == id_term_escolhido].iloc[0]
 
-                # Gerar gráfico com Matplotlib se disponível
                 caminho_grafico = "temp_chart_temp.png"
                 if MATPLOTLIB_DISPONIVEL:
                     try:
@@ -656,7 +655,6 @@ else:
                 doc_t.add_paragraph()
                 doc_t.add_heading("1. Resumo das Temperaturas Medidas", level=2)
                 
-                # Inserir imagem do gráfico se gerada
                 if MATPLOTLIB_DISPONIVEL and os.path.exists(caminho_grafico):
                     try:
                         doc_t.add_picture(caminho_grafico, width=Inches(5.5))
@@ -715,6 +713,7 @@ else:
             "Krauss Maffei 40/40 (Cabeçote 1)", 
             "Krauss Maffei 80/80 (Cabeçote 2)"
         ], key="insp_maquina_select")
+        
         with st.form("form_inspecao_semana"):
             st.markdown("### 2️⃣ Identificação da Auditoria")
             c_insp1, c_insp2 = st.columns(2)
@@ -724,6 +723,7 @@ else:
                 insp_responsavel = st.text_input("Responsável Técnico", "Rogério Grahl — CREA SC 1039223-9")
             with c_insp2:
                 insp_semana = st.text_input("Semana de Referência / Período", "Semana 35 / 2026")
+
             st.markdown("---")
             st.markdown(f"### 3️⃣ Avaliação dos Pilares da Produção — {insp_maquina}")
             col_p1, col_p2 = st.columns(2)
@@ -731,21 +731,26 @@ else:
                 st.markdown("#### 🛠️ Manutenção & Equipamentos")
                 insp_manut_status = st.selectbox("Status Manutenção do Cabeçote:", ["Conforme", "Parcialmente Conforme", "Não Conforme"], key="insp_manut_status_key")
                 insp_manut_obs = st.text_area("Observações de Manutenção:", placeholder="Ex: Vazamentos, calibração de vazão, bicos...")
+                
                 st.markdown("#### ⚖️ Controle de Pesagem & Reatividade")
                 insp_peso_status = st.selectbox("Status Desvios de Pesagem:", ["Dentro da tolerância (±50g)", "Desvio Moderado", "Desvio Crítico (>100g)"], key="insp_peso_status_key")
                 insp_peso_obs = st.text_area("Observações de Pesagem:", placeholder="Ex: Análise das taras, médias de injeção...")
+
             with col_p2:
                 st.markdown("#### 🔍 Qualidade de Espuma & Processo")
                 insp_qual_status = st.selectbox("Status Conformidade Físico-Estrutural:", ["Aprovado (NBR 8082)", "Alerta de Deformação", "Reprovado"], key="insp_qual_status_key")
                 insp_qual_obs = st.text_area("Observações de Qualidade:", placeholder="Ex: Células fechadas, retrabalhos, aderência...")
+                
                 st.markdown("#### 🦺 Segurança Operacional & Meio Ambiente")
                 insp_seg_status = st.selectbox("Status EPIs, Ventilação e Ciclopentano (HC):", ["Conforme", "Advertência", "Paralisação Recomendada"], key="insp_seg_status_key")
                 insp_seg_obs = st.text_area("Observações de Segurança:", placeholder="Ex: Exaustão ativa, detectores de gás, EPIs...")
+
             st.markdown("---")
             st.markdown("### 4️⃣ Anexo de Evidência Fotográfica & Conclusão")
             foto_enviada = st.file_uploader("📸 Enviar Foto do Local / Equipamento", type=["jpg", "jpeg", "png"], key="foto_insp_up")
             insp_fotos_desc = st.text_area("Registro Descritivo das Evidências Visuais:", placeholder="Descreva os pontos inspecionados visualmente...")
             insp_conclusao = st.text_area("Conclusão Executiva & Recomendações Técnicas:", placeholder="Diretrizes gerais para a gestão desta máquina...")
+
             btn_gerar_relatorio = st.form_submit_button("Salvar Inspeção e Gerar Laudo Técnico")
 
         if btn_gerar_relatorio:
@@ -756,6 +761,15 @@ else:
             except:
                 df_db_insp = pd.DataFrame()
                 proximo_id_insp = "INS-001"
+
+            # Salvar a imagem enviada em disco com o ID correspondente se houver upload
+            caminho_foto_salva = ""
+            if foto_enviada is not None:
+                os.makedirs("fotos_inspecoes", exist_ok=True)
+                caminho_foto_salva = f"fotos_inspecoes/{proximo_id_insp}.png"
+                with open(caminho_foto_salva, "wb") as f:
+                    f.write(foto_enviada.getbuffer())
+
             novo_reg_insp = {
                 "ID": proximo_id_insp,
                 "Data": insp_data.strftime("%d/%m/%Y"),
@@ -771,8 +785,10 @@ else:
                 "Segurança Status": insp_seg_status,
                 "Segurança Obs": limpar_valor(insp_seg_obs),
                 "Evidências Desc": limpar_valor(insp_fotos_desc),
+                "Foto_Path": caminho_foto_salva,
                 "Conclusão": limpar_valor(insp_conclusao)
             }
+
             df_db_insp = pd.concat([df_db_insp, pd.DataFrame([novo_reg_insp])], ignore_index=True)
             df_db_insp.to_excel(arq_db_insp, index=False)
             st.success(f"Inspeção **{proximo_id_insp}** salva com sucesso no banco de dados!")
@@ -783,73 +799,105 @@ else:
             st.markdown("### 🗄️ Banco de Dados & Histórico de Inspeções")
             df_insp_hist = pd.read_excel("Log_Inspecoes_Semanais.xlsx")
             st.dataframe(df_insp_hist[['ID', 'Data', 'Semana', 'Máquina', 'Responsável']], use_container_width=True)
+            
             id_insp_escolhido = st.selectbox("Selecione o ID da Inspeção para gerar o Laudo Word:", df_insp_hist['ID'].tolist(), key="select_id_insp_banco")
+            
             if id_insp_escolhido and DOCX_DISPONIVEL:
                 reg_i = df_insp_hist[df_insp_hist['ID'] == id_insp_escolhido].iloc[0]
+                
                 doc_i = Document()
                 aplicar_estilo_abadi_e_espacamento(doc_i)
+                
                 for section in doc_i.sections:
                     section.top_margin = Inches(1.18)
                     section.bottom_margin = Inches(0.78)
                     section.left_margin = Inches(1.18)
                     section.right_margin = Inches(0.78)
+                        
                 p_emp = doc_i.add_paragraph()
                 p_emp.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 run_emp = p_emp.add_run("GRAHL CONSULTORIA E TREINAMENTOS\n")
                 run_emp.bold = True
                 run_emp.font.size = Pt(14)
                 run_emp.font.color.rgb = RGBColor(31, 78, 120)
+                
                 run_sub = p_emp.add_run("Gestão de Injeção, Reologia e Qualidade em Poliuretano\n")
                 run_sub.font.size = Pt(10)
+                
                 p_tit = doc_i.add_paragraph()
                 p_tit.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 run_tit = p_tit.add_run(f"\nRELATÓRIO TÉCNICO DE INSPEÇÃO — {reg_i['ID']}\n")
                 run_tit.bold = True
                 run_tit.font.size = Pt(12)
+                
                 run_maq = p_tit.add_run(f"Máquina Alvo: {reg_i['Máquina']}")
                 run_maq.bold = True
                 run_maq.font.size = Pt(11)
+                
                 doc_i.add_paragraph()
+                
                 t_meta_i = doc_i.add_table(rows=2, cols=2)
                 t_meta_i.cell(0, 0).text = f"Período: {limpar_valor(reg_i['Semana'])}"
                 t_meta_i.cell(0, 1).text = f"Data da Emissão: {limpar_valor(reg_i['Data'])}"
                 t_meta_i.cell(1, 0).text = f"Injetora: {limpar_valor(reg_i['Máquina'])}"
                 t_meta_i.cell(1, 1).text = f"Responsável: {limpar_valor(reg_i['Responsável'])}"
                 formatar_tabela_profissional(t_meta_i, com_cabecalho=False)
+                
                 doc_i.add_paragraph()
+                
                 h1 = doc_i.add_heading("1. Sumário Executivo", level=2)
                 h1.runs[0].font.color.rgb = RGBColor(31, 78, 120)
                 doc_i.add_paragraph(f"O presente relatório consolida a auditoria técnica semanal ({limpar_valor(reg_i['ID'])}) realizada na linha de injeção {limpar_valor(reg_i['Máquina'])}, contemplando verificação de reatividade, desvios de massa/pesagem, integridade mecânica e conformidade regulamentar sob diretrizes da Grahl Consultoria.")
+                
                 h2 = doc_i.add_heading("2. Parecer dos Pilares Operacionais", level=2)
                 h2.runs[0].font.color.rgb = RGBColor(31, 78, 120)
+                
                 t_pilares_i = doc_i.add_table(rows=5, cols=3)
                 hdr_c = t_pilares_i.rows[0].cells
                 hdr_c[0].text = "Pilar de Avaliação"
                 hdr_c[1].text = "Status"
                 hdr_c[2].text = "Apontamentos de Campo"
+                            
                 dados_tb_i = [
                     ("Manutenção", limpar_valor(reg_i['Manutenção Status']), limpar_valor(reg_i['Manutenção Obs'])),
                     ("Pesagem / Reatividade", limpar_valor(reg_i['Pesagem Status']), limpar_valor(reg_i['Pesagem Obs'])),
                     ("Qualidade Estrutural", limpar_valor(reg_i['Qualidade Status']), limpar_valor(reg_i['Qualidade Obs'])),
                     ("Segurança & HC", limpar_valor(reg_i['Segurança Status']), limpar_valor(reg_i['Segurança Obs']))
                 ]
+                
                 for idx, (pilar, st_v, obs_v) in enumerate(dados_tb_i):
                     r_c = t_pilares_i.rows[idx + 1].cells
                     r_c[0].text = pilar
                     r_c[1].text = st_v
                     r_c[2].text = obs_v
+                    
                 formatar_tabela_profissional(t_pilares_i, com_cabecalho=True)
                 doc_i.add_paragraph()
+                
                 h3 = doc_i.add_heading("3. Evidências Fotográficas e Descritivas", level=2)
                 h3.runs[0].font.color.rgb = RGBColor(31, 78, 120)
                 doc_i.add_paragraph(f"Descrição das Evidências: {limpar_valor(reg_i['Evidências Desc'])}")
+                
+                # INSERIR A FOTO NO RELATÓRIO WORD SE ELA EXISTIR
+                foto_path_reg = str(reg_i.get('Foto_Path', ''))
+                if foto_path_reg and os.path.exists(foto_path_reg):
+                    try:
+                        doc_i.add_picture(foto_path_reg, width=Inches(5.0))
+                        doc_i.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    except Exception as ex:
+                        doc_i.add_paragraph(f"[Aviso: Não foi possível anexar a imagem gráfica: {ex}]")
+                
+                doc_i.add_paragraph()
                 h4 = doc_i.add_heading("4. Conclusão e Recomendações Técnicas", level=2)
                 h4.runs[0].font.color.rgb = RGBColor(31, 78, 120)
                 doc_i.add_paragraph(limpar_valor(reg_i['Conclusão']))
+                
                 adicionar_assinatura_padrao(doc_i, responsavel=limpar_valor(reg_i['Responsável']))
+                
                 bio_i = io.BytesIO()
                 doc_i.save(bio_i)
                 bio_i.seek(0)
+                
                 st.download_button(
                     label=f"📥 Baixar Laudo da Inspeção {reg_i['ID']} em Word (.docx)",
                     data=bio_i.getvalue(),
@@ -861,6 +909,7 @@ else:
     elif st.session_state["menu_ativo"] == "anomalias":
         st.subheader("⚠️ Registro de Anomalias & Abertura de Ocorrência")
         st.markdown("Registre a não conformidade. Um número de ID (Pendência) será gerado automaticamente.")
+        
         agenda_emails = {
             "Rogério Grahl (Engenheiro Consultor) — Rograhl75@gmail.com": "Rograhl75@gmail.com",
             "Pedro Mantovani (Gerente Slitter) — pedro.mantovani@fastgondolas.com.br": "pedro.mantovani@fastgondolas.com.br",
@@ -870,6 +919,7 @@ else:
             "Robson Milanez (Gerente Manutenção) — robson.milanez@fastgondolas.com.br": "robson.milanez@fastgondolas.com.br",
             "Gledston Santana (Gerente Qualidade) — gledston.santana@fastgondolas.com.br": "gledston.santana@fastgondolas.com.br"
         }
+        
         with st.form("form_anomalia"):
             st.markdown("### 1️⃣ Dados da Ocorrência")
             col_a1, col_a2 = st.columns(2)
@@ -882,9 +932,12 @@ else:
                 resp_selecionado = st.selectbox("Direcionar para o Responsável:", list(agenda_emails.keys()), key="anom_resp_select")
                 a_email_destino = agenda_emails[resp_selecionado]
                 a_responsavel_cargo = resp_selecionado.split(" — ")[0]
+                
             a_problema = st.text_area("Descrição do Problema Detectado (Ocorrência):", placeholder="Ex: Desvio de densidade acima do limite superior...")
+            
             st.markdown("---")
             st.markdown("### 2️⃣ Matriz de Tratativa Corretiva — 5W1H (Opcional na Abertura)")
+            
             col_5w1, col_5w2 = st.columns(2)
             with col_5w1:
                 w_what = st.text_input("1. What (Ação Corretiva):", placeholder="Pode ser preenchido posteriormente")
@@ -894,20 +947,26 @@ else:
                 w_when = st.text_input("4. When (Prazo limite):", placeholder="Pode ser preenchido posteriormente")
                 w_who = st.text_input("5. Who (Quem executará):", placeholder="Pode ser preenchido posteriormente")
                 w_how = st.text_input("6. How (Método):", placeholder="Pode ser preenchido posteriormente")
+
             status_tratativa = st.selectbox("Status da Tratativa:", ["Pendente Ação Corretiva", "Em Andamento (5W1H)", "Concluído & Validado"], key="anom_status_select")
+            
             btn_enviar_anomalia = st.form_submit_button("Salvar Ocorrência e Disparar E-mail Imediato")
+            
             if btn_enviar_anomalia:
                 if not a_problema.strip():
                     st.warning("Por favor, descreva o problema antes de salvar a ocorrência.")
                 else:
                     arq_anomalias = "Log_Registro_Anomalias.xlsx"
+                    
                     try:
                         df_temp_id = pd.read_excel(arq_anomalias)
                         proximo_id = f"OC-{len(df_temp_id) + 1:03d}"
                     except:
                         proximo_id = "OC-001"
+
                     fuso_br = timezone(timedelta(hours=-3))
                     a_hora_sistema = datetime.now(fuso_br).strftime("%H:%M")
+                    
                     novo_reg_anom = {
                         "ID": proximo_id,
                         "Data": a_data.strftime("%d/%m/%Y"),
@@ -924,28 +983,35 @@ else:
                         "How (Como)": w_how if w_how.strip() else "Não informado na abertura",
                         "Status": status_tratativa
                     }
+                    
                     try:
                         df_anom = pd.read_excel(arq_anomalias)
                         df_anom = pd.concat([df_anom, pd.DataFrame([novo_reg_anom])], ignore_index=True)
                     except:
                         df_anom = pd.DataFrame([novo_reg_anom])
                     df_anom.to_excel(arq_anomalias, index=False)
+                    
                     try:
                         smtp_server = "smtp.gmail.com"
                         smtp_port = 587
                         remetente_email = "Rograhl75@gmail.com"
                         senha_app = "wrbf oqou loik cwkb"
+                        
                         msg = MIMEMultipart()
                         msg['From'] = remetente_email
                         msg['To'] = a_email_destino
                         msg['Subject'] = f"[ALERTA PU 4.0 - {proximo_id}] Não Conformidade em {a_maquina}"
+                        
                         corpo_email = f"""
                         Prezado(a) {a_responsavel_cargo},
+                        
                         Uma nova ocorrência ({proximo_id}) foi aberta no sistema ARIAM PU Control 4.0 e requer sua atenção:
+                        
                         - ID da Pendência: {proximo_id}
                         - Data/Hora: {a_data.strftime('%d/%m/%Y')} às {a_hora_sistema}
                         - Máquina Afetada: {a_maquina}
                         - Descrição do Problema: {a_problema}
+                        
                         PLANO DE AÇÃO 5W1H (Parcial / Acompanhamento):
                         - What (Ação): {novo_reg_anom['What (Ação)']}
                         - Why (Motivo): {novo_reg_anom['Why (Por que)']}
@@ -954,15 +1020,18 @@ else:
                         - Who (Responsável): {novo_reg_anom['Who (Quem)']}
                         - How (Método): {novo_reg_anom['How (Como)']}
                         - Status Atual: {status_tratativa}
+                        
                         Atenciosamente,
                         Sistema Automatizado - Grahl Consultoria e Treinamentos
                         """
                         msg.attach(MIMEText(corpo_email, 'plain', 'utf-8'))
+                        
                         server = smtplib.SMTP(smtp_server, smtp_port)
                         server.starttls()
                         server.login(remetente_email, senha_app)
                         server.sendmail(remetente_email, a_email_destino, msg.as_string())
                         server.quit()
+                        
                         st.success(f"Ocorrência **{proximo_id}** salva e e-mail de alerta disparado com sucesso para **{a_email_destino}**!")
                     except Exception as ex:
                         st.warning(f"Ocorrência {proximo_id} salva com sucesso na planilha, mas houve falha no envio do e-mail: {ex}")
@@ -971,14 +1040,18 @@ else:
             st.markdown("---")
             st.markdown("### 📊 Histórico Geral de Ocorrências & Pendências (5W1H)")
             df_hist = pd.read_excel("Log_Registro_Anomalias.xlsx")
+            
             if 'ID' not in df_hist.columns:
                 df_hist.insert(0, 'ID', [f"OC-{i+1:03d}" for i in range(len(df_hist))])
                 df_hist.to_excel("Log_Registro_Anomalias.xlsx", index=False)
+                
             colunas_resumo = ['ID', 'Data', 'Hora', 'Máquina', 'Responsável', 'Status']
             st.dataframe(df_hist[colunas_resumo], use_container_width=True)
+            
             if DOCX_DISPONIVEL:
                 doc_anom = Document()
                 aplicar_estilo_abadi_e_espacamento(doc_anom)
+                
                 p_h = doc_anom.add_paragraph()
                 p_h.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 run_h = p_h.add_run("GRAHL CONSULTORIA E TREINAMENTOS\n")
@@ -987,15 +1060,19 @@ else:
                 run_h.font.color.rgb = RGBColor(31, 78, 120)
                 run_sub = p_h.add_run("Relatório Executivo Consolidado de Ocorrências e Matriz 5W1H")
                 run_sub.font.size = Pt(11)
+                
                 doc_anom.add_paragraph()
+                
                 t_anom = doc_anom.add_table(rows=len(df_hist) + 1, cols=len(colunas_resumo))
                 for i, c_name in enumerate(colunas_resumo):
                     t_anom.cell(0, i).text = str(c_name)
                 for r_idx, row in df_hist[colunas_resumo].iterrows():
                     for c_idx, val in enumerate(row):
                         t_anom.cell(r_idx + 1, c_idx).text = limpar_valor(val)
+                        
                 formatar_tabela_profissional(t_anom, com_cabecalho=True)
                 adicionar_assinatura_padrao(doc_anom)
+                
                 bio_a = io.BytesIO()
                 doc_anom.save(bio_a)
                 bio_a.seek(0)
@@ -1006,14 +1083,18 @@ else:
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     key="btn_down_anom_geral"
                 )
+                
             st.markdown("#### 🔍 Detalhes da Ocorrência & Laudo Individual")
             lista_ids = df_hist['ID'].tolist()
             id_selecionado = st.selectbox("Selecione o ID da Pendência para ver a descrição completa e baixar o laudo individual:", lista_ids, key="id_pendencia_select")
+            
             if id_selecionado:
                 registro_detalhe = df_hist[df_hist['ID'] == id_selecionado].iloc[0]
+                
                 st.info(f"**Pendência:** {registro_detalhe['ID']} | **Data/Hora:** {registro_detalhe['Data']} às {registro_detalhe['Hora']} | **Máquina:** {registro_detalhe['Máquina']}")
                 st.markdown(f"**👤 Responsável:** {registro_detalhe['Responsável']} (`{registro_detalhe['E-mail Destino']}`)")
                 st.markdown(f"**⚠️ Descrição do Problema:**\n> {registro_detalhe['Problema']}")
+                
                 with st.expander("📋 Ver Matriz 5W1H Completa desta Ocorrência"):
                     c_ex1, c_ex2 = st.columns(2)
                     with c_ex1:
@@ -1029,43 +1110,56 @@ else:
                 if DOCX_DISPONIVEL:
                     doc_ind = Document()
                     aplicar_estilo_abadi_e_espacamento(doc_ind)
+                    
                     for section in doc_ind.sections:
                         section.top_margin = Inches(1.18)
                         section.bottom_margin = Inches(0.78)
                         section.left_margin = Inches(1.18)
                         section.right_margin = Inches(0.78)
+                    
                     p_ei = doc_ind.add_paragraph()
                     p_ei.alignment = WD_ALIGN_PARAGRAPH.CENTER
                     r_ei = p_ei.add_run("GRAHL CONSULTORIA E TREINAMENTOS\n")
                     r_ei.bold = True
                     r_ei.font.size = Pt(14)
                     r_ei.font.color.rgb = RGBColor(31, 78, 120)
+                    
                     r_subi = p_ei.add_run("Gestão de Injeção, Reologia e Qualidade em Poliuretano\n")
                     r_subi.font.size = Pt(10)
+                    
                     p_ti = doc_ind.add_paragraph()
                     p_ti.alignment = WD_ALIGN_PARAGRAPH.CENTER
                     r_ti = p_ti.add_run(f"\nRELATÓRIO TÉCNICO DE NÃO CONFORMIDADE — {limpar_valor(registro_detalhe['ID'])}\n")
                     r_ti.bold = True
                     r_ti.font.size = Pt(12)
+                    
                     r_mqi = p_ti.add_run(f"Máquina Afetada: {limpar_valor(registro_detalhe['Máquina'])}")
                     r_mqi.bold = True
                     r_mqi.font.size = Pt(11)
+                    
                     doc_ind.add_paragraph()
+                    
                     t_meta_ind = doc_ind.add_table(rows=2, cols=2)
                     t_meta_ind.cell(0, 0).text = f"Data da Ocorrência: {limpar_valor(registro_detalhe['Data'])}"
                     t_meta_ind.cell(0, 1).text = f"Horário: {limpar_valor(registro_detalhe['Hora'])}"
                     t_meta_ind.cell(1, 0).text = f"Responsável Direcionado: {limpar_valor(registro_detalhe['Responsável'])}"
                     t_meta_ind.cell(1, 1).text = f"Status Atual: {limpar_valor(registro_detalhe['Status'])}"
                     formatar_tabela_profissional(t_meta_ind, com_cabecalho=False)
+                    
                     doc_ind.add_paragraph()
+                    
                     h_desc = doc_ind.add_heading("1. Descrição da Anomalia", level=2)
                     h_desc.runs[0].font.color.rgb = RGBColor(31, 78, 120)
                     doc_ind.add_paragraph(f"Problema Detectado / Ocorrência:\n{limpar_valor(registro_detalhe['Problema'])}")
+                    
                     h_5w = doc_ind.add_heading("2. Plano de Ação Corretiva (Matriz 5W1H)", level=2)
                     h_5w.runs[0].font.color.rgb = RGBColor(31, 78, 120)
+                    
                     t_5w_ind = doc_ind.add_table(rows=8, cols=2)
+                    
                     t_5w_ind.cell(0, 0).text = "Parâmetro da Matriz 5W1H"
                     t_5w_ind.cell(0, 1).text = "Detalhamento da Ação / Diretriz"
+                    
                     t_5w_ind.cell(1, 0).text = "1. What (Ação Corretiva)"
                     t_5w_ind.cell(1, 1).text = limpar_valor(registro_detalhe['What (Ação)'])
                     t_5w_ind.cell(2, 0).text = "2. Why (Justificativa)"
@@ -1080,11 +1174,14 @@ else:
                     t_5w_ind.cell(6, 1).text = limpar_valor(registro_detalhe['How (Como)'])
                     t_5w_ind.cell(7, 0).text = "Status da Tratativa"
                     t_5w_ind.cell(7, 1).text = limpar_valor(registro_detalhe['Status'])
+                    
                     formatar_tabela_profissional(t_5w_ind, com_cabecalho=True)
                     adicionar_assinatura_padrao(doc_ind, responsavel=limpar_valor(registro_detalhe['Responsável']))
+                    
                     bio_ind = io.BytesIO()
                     doc_ind.save(bio_ind)
                     bio_ind.seek(0)
+                    
                     st.download_button(
                         label=f"📥 Baixar Laudo Individual da Ocorrência {registro_detalhe['ID']} (.docx)",
                         data=bio_ind.getvalue(),
