@@ -1,110 +1,41 @@
-import os
+"""Automação de migração inicial de base legada para SQLite."""
+
+from __future__ import annotations
+
+from pathlib import Path
 import pandas as pd
-import requests
 
-print("==================================================")
-print("   GRAHL CONSULTORIA - AUTOMAÇÃO DE INJEÇÃO DE PU ")
-print("==================================================")
+from src.config import get_settings
+from src.services.processo_service import ProcessoService
+from src.storage.sqlite_repository import SQLiteRepository
+from src.weather_service import WeatherService
 
-arquivo_produtos = "59001000100 - ISOLAMENTO ESPUMADO POLIOL SHPOL SO SH RIG - 26-06-2026.xlsx"
 
-try:
-    print("[1/4] Lendo planilhas de processo (CAB 1 e CAB 2)...")
-    xls = pd.ExcelFile(arquivo_produtos)
-    
-    # Validação segura para evitar falhas de índice se a aba não for encontrada exatamente
-    abas_cab1 = [s for s in xls.sheet_names if 'CAB 1' in s]
-    abas_cab2 = [s for s in xls.sheet_names if 'CAB 2' in s]
-    
-    cab1_sheet = abas_cab1[-1] if abas_cab1 else xls.sheet_names[0]
-    cab2_sheet = abas_cab2[-1] if abas_cab2 else (xls.sheet_names[1] if len(xls.sheet_names) > 1 else xls.sheet_names[0])
-    
-    df_c1 = pd.read_excel(arquivo_produtos, sheet_name=cab1_sheet, header=None)
-    df_c1_clean = df_c1.iloc[2:].copy()
-    df_c1_clean['Maquina'] = "Krauss Maffei 40/40"
-    df_c1_clean['Cabecote_Ref'] = 1
-    df_c1_clean['Vazao_Cabecote_g_s'] = 650
-    df_c1_clean['Pressao_Injecao'] = "130 ± 10 bar"
-    
-    df_c2 = pd.read_excel(arquivo_produtos, sheet_name=cab2_sheet, header=None)
-    df_c2_clean = df_c2.iloc[2:].copy()
-    df_c2_clean['Maquina'] = "Krauss Maffei 80/80"
-    df_c2_clean['Cabecote_Ref'] = 2
-    df_c2_clean['Vazao_Cabecote_g_s'] = 3000
-    df_c2_clean['Pressao_Injecao'] = "140 ± 10 bar (Rim)"
+def gerar_base_processada(input_path: str | Path) -> pd.DataFrame:
+    """Lê planilha legada, processa e devolve DataFrame calculado."""
+    settings = get_settings()
+    temp = WeatherService(settings.weather_latitude, settings.weather_longitude).get_temperature()
+    df = pd.read_excel(input_path)
+    return ProcessoService().process_dataframe(df, temperatura=temp)
 
-    for df_item in [df_c1_clean, df_c2_clean]:
-        df_item.rename(columns={
-            1: 'Expositor',
-            2: 'Componente',
-            3: 'Codigo_Item',
-            4: 'Descricao',
-            6: 'Volume',
-            7: 'Massa_Nominal',
-            8: 'Massa_Frio',
-            9: 'Massa_Calor'
-        }, inplace=True)
 
-    colunas_interesse = ['Expositor', 'Componente', 'Codigo_Item', 'Descricao', 'Volume', 'Massa_Nominal', 'Massa_Frio', 'Massa_Calor', 'Maquina', 'Cabecote_Ref', 'Vazao_Cabecote_g_s', 'Pressao_Injecao']
-    
-    df_produtos = pd.concat([df_c1_clean[colunas_interesse], df_c2_clean[colunas_interesse]], ignore_index=True)
-    df_produtos = df_produtos.dropna(subset=['Codigo_Item', 'Volume'])
-    
-    print("     -> Abas CAB 1 e CAB 2 unificadas com sucesso!")
+def migrar_para_sqlite(input_path: str | Path) -> int:
+    """Importa dados de processo para tabela de medições SQLite."""
+    df = gerar_base_processada(input_path)
+    repo = SQLiteRepository(get_settings().db_path)
+    repo.init_schema()
+    for _, row in df.iterrows():
+        repo.save_measurement(
+            "producao",
+            {
+                "created_at": pd.Timestamp.utcnow().isoformat(),
+                **row.to_dict(),
+            },
+        )
+    return len(df)
 
-except Exception as e:
-    print(f"     -> Erro crítico ao ler abas: {e}")
-    # Criação de um fallback seguro caso o excel falhe na nuvem
-    df_produtos = pd.DataFrame(columns=['Expositor', 'Componente', 'Codigo_Item', 'Descricao', 'Volume', 'Massa_Nominal', 'Massa_Frio', 'Massa_Calor', 'Maquina', 'Cabecote_Ref', 'Vazao_Cabecote_g_s', 'Pressao_Injecao'])
 
-df_produtos['Volume'] = pd.to_numeric(df_produtos['Volume'], errors='coerce')
-df_produtos['Massa_Nominal'] = pd.to_numeric(df_produtos['Massa_Nominal'], errors='coerce')
-df_produtos['Massa_Frio'] = pd.to_numeric(df_produtos['Massa_Frio'], errors='coerce')
-df_produtos['Massa_Calor'] = pd.to_numeric(df_produtos['Massa_Calor'], errors='coerce')
-
-df_produtos['Massa_Frio'] = df_produtos['Massa_Frio'].fillna(df_produtos['Massa_Nominal'])
-df_produtos['Massa_Calor'] = df_produtos['Massa_Calor'].fillna(df_produtos['Massa_Nominal'])
-
-# 2. CAPTURA AUTOMÁTICA DA METEOROLOGIA EM LONDRINA - PR
-print("[2/4] Conectando à API de Meteorologia para Londrina-PR...")
-lat, lon = -23.31028, -51.16278
-try:
-    url_meteo = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
-    resposta = requests.get(url_meteo, timeout=5)
-    temp_atual = float(resposta.json()['current_weather']['temperature'])
-    print(f"     -> Temperatura capturada com sucesso via satélite: {temp_atual} °C")
-except Exception:
-    temp_atual = 24.0
-    print(f"     -> Modo offline ativado. Temperatura padrão: {temp_atual} °C")
-
-# 3. AVALIAÇÃO SAZONAL E CÁLCULO DE DENSIDADES
-print("[3/4] Reavaliando parâmetros de máquina, massas e densidades...")
-if temp_atual < 22.0:
-    df_produtos['Massa_Trabalho'] = df_produtos['Massa_Frio']
-    df_produtos['Condicao_Climatica'] = "FRIO (<22°C) - Overpacking"
-    df_produtos['Setpoint_Material_C'] = 24.0
-elif temp_atual > 28.0:
-    df_produtos['Massa_Trabalho'] = df_produtos['Massa_Calor']
-    df_produtos['Condicao_Climatica'] = "CALOR (>28°C) - Underpacking"
-    df_produtos['Setpoint_Material_C'] = 22.0
-else:
-    df_produtos['Massa_Trabalho'] = df_produtos['Massa_Nominal']
-    df_produtos['Condicao_Climatica'] = "NOMINAL (Estável)"
-    df_produtos['Setpoint_Material_C'] = 23.0
-
-df_produtos['Relacao_Iso_Pol'] = "1,34 ± 0,03 pbw"
-df_produtos['Temp_Moldes_C'] = "45 ± 5 °C (Mínimo: 40 °C)"
-
-df_produtos['Tempo_Injecao_Seg'] = (df_produtos['Massa_Trabalho'] * 1000) / df_produtos['Vazao_Cabecote_g_s']
-
-df_produtos['Densidade_Nominal'] = df_produtos['Massa_Nominal'] / df_produtos['Volume']
-df_produtos['Densidade_Frio'] = df_produtos['Massa_Frio'] / df_produtos['Volume']
-df_produtos['Densidade_Calor'] = df_produtos['Massa_Calor'] / df_produtos['Volume']
-df_produtos['Densidade_Real_Calculada']	= df_produtos['Massa_Trabalho'] / df_produtos['Volume']
-
-df_produtos['Resistencia_Compressao_Est_kPa'] = (df_produtos['Densidade_Real_Calculada'] * 8.8) - 160
-df_produtos['Status_Estrutural'] = df_produtos['Resistencia_Compressao_Est_kPa'].apply(lambda x: "APROVADO" if x >= 110 else "ALERTA: RISCO DE DEFORMAÇÃO")
-
-arquivo_saida = "Relatorio_Processo_Injecao_Atualizado.xlsx"
-df_produtos.to_excel(arquivo_saida, index=False)
-print(f"[4/4] Planilha avançada gerada com sucesso: '{arquivo_saida}'")
+if __name__ == "__main__":
+    origem = "Relatorio_Processo_Injecao_Atualizado.xlsx"
+    total = migrar_para_sqlite(origem)
+    print(f"{total} registros migrados para SQLite em {get_settings().db_path}")

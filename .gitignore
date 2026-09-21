@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# Virtual env
+.venv/
+venv/
+
+# Streamlit secrets
+.streamlit/secrets.toml
+
+# SQLite and logs
+data/*.db
+*.db
+*.sqlite
+*.sqlite3
+Log_*.xlsx
+Relatorio_Processo_Injecao_Atualizado.xlsx
+
+# Build / dist
+build/
+dist/
+*.egg-info/
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Temporary files
+/tmp/
+*.tmp
