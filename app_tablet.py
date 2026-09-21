@@ -62,20 +62,95 @@ if not verificar_senha():
 st.markdown("""
     <style>
         [data-testid="stSidebar"] {
-            min-width: 230px !important;
-            max-width: 230px !important;
+            min-width: 250px !important;
+            max-width: 250px !important;
+        }
+        .block-container {
+            padding-top: 1.2rem;
+            padding-left: 1.5rem;
+            padding-right: 1.5rem;
+        }
+        .app-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1.2rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.35rem;
+        }
+        .app-header-title h1 {
+            margin: 0;
+            line-height: 1.2;
+            color: #1F4E78;
+            text-align: center;
+            font-size: clamp(1.45rem, 2.4vw, 2.25rem);
+            overflow-wrap: anywhere;
+        }
+        .app-header-title p {
+            margin: 0.35rem 0 0 0;
+            color: #4a4a4a;
+            text-align: center;
+            font-weight: 600;
+        }
+        .exec-card {
+            background-color: #f8f9fa;
+            border: 2px solid #1F4E78;
+            border-radius: 10px;
+            padding: 18px;
+            text-align: center;
+            min-height: 205px;
+            box-shadow: 0 3px 5px rgba(0, 0, 0, 0.04);
+            margin-bottom: 10px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+        }
+        .exec-card-icon {
+            font-size: 32px;
+            margin-bottom: 6px;
+            line-height: 1;
+        }
+        .exec-card h3 {
+            color: #1F4E78;
+            margin: 0 0 8px 0;
+            font-size: 16px;
+        }
+        .exec-card p {
+            font-size: 12px;
+            color: #666;
+            margin: 0;
+            line-height: 1.35;
+        }
+        @media (max-width: 1100px) {
+            [data-testid="stSidebar"] {
+                min-width: 235px !important;
+                max-width: 235px !important;
+            }
+            .block-container {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+            .exec-card {
+                min-height: 220px;
+            }
         }
     </style>
 """, unsafe_allow_html=True)
 
-col_logo, col_titulo = st.columns([1, 4])
+col_logo, col_titulo = st.columns([1, 5], gap="medium")
 with col_logo:
     logo_path = "logo.jpg" if os.path.exists("logo.jpg") else ("logo.png" if os.path.exists("logo.png") else None)
     if logo_path:
-        st.image(logo_path, width=180)
+        st.image(logo_path, width=140)
 with col_titulo:
-    st.title("ARIAM PU 4.0 - Assistente Técnico de Campo")
-    st.markdown("**Grahl Consultoria e Treinamentos** | Gestão de Injeção, Reologia e Qualidade")
+    st.markdown("""
+        <div class="app-header">
+            <div class="app-header-title">
+                <h1>ARIAM PU 4.0 - Assistente Técnico de Campo</h1>
+                <p>Grahl Consultoria e Treinamentos | Gestão de Injeção, Reologia e Qualidade</p>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
 
 st.sidebar.markdown("---")
 st.sidebar.write(f"👤 **Conectado como:** `{st.session_state.get('usuario_atual', 'Usuário')}`")
@@ -210,92 +285,53 @@ if "menu_ativo" not in st.session_state:
 def voltar_ao_menu():
     st.session_state["menu_ativo"] = "home"
 
+def render_card(icon, titulo, descricao):
+    st.markdown(f"""
+        <div class="exec-card">
+            <div class="exec-card-icon">{icon}</div>
+            <h3>{titulo}</h3>
+            <p>{descricao}</p>
+        </div>
+    """, unsafe_allow_html=True)
+
 if st.session_state["menu_ativo"] == "home":
     st.markdown("<h2 style='text-align: center; color: #1F4E78;'>Painel Executivo de Controle de Processos</h2>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; color: #555; margin-bottom: 25px;'>Selecione o módulo operacional desejado abaixo:</p>", unsafe_allow_html=True)
     
     col_c1, col_c2, col_c3 = st.columns(3)
     with col_c1:
-        st.markdown("""
-        <div style="background-color: #f8f9fa; border: 2px solid #1F4E78; border-radius: 10px; padding: 18px; text-align: center; height: 175px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 3px 5px rgba(0,0,0,0.04); margin-bottom: 10px;">
-            <div>
-                <div style="font-size: 32px; margin-bottom: 6px;">⚙️</div>
-                <h3 style="color: #1F4E78; margin: 0 0 6px 0; font-size: 16px;">Produção & Máquinas</h3>
-                <p style="font-size: 12px; color: #666; margin: 0; line-height: 1.3;">Painel CLP, massas ideais, tempos, pressões e validação NBR 8082.</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        render_card("⚙️", "Produção & Máquinas", "Painel CLP, massas ideais, tempos, pressões e validação NBR 8082.")
         if st.button("Acessar Produção", use_container_width=True):
             st.session_state["menu_ativo"] = "producao"
             st.rerun()
             
     with col_c2:
-        st.markdown("""
-        <div style="background-color: #f8f9fa; border: 2px solid #1F4E78; border-radius: 10px; padding: 18px; text-align: center; height: 175px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 3px 5px rgba(0,0,0,0.04); margin-bottom: 10px;">
-            <div>
-                <div style="font-size: 32px; margin-bottom: 6px;">⚖️</div>
-                <h3 style="color: #1F4E78; margin: 0 0 6px 0; font-size: 16px;">Controle de Pesagem</h3>
-                <p style="font-size: 12px; color: #666; margin: 0; line-height: 1.3;">Registro de massas em campo, desvios e emissão de laudo Word.</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        render_card("⚖️", "Controle de Pesagem", "Registro de massas em campo, desvios e emissão de laudo Word.")
         if st.button("Acessar Pesagem", use_container_width=True):
             st.session_state["menu_ativo"] = "pesagem"
             st.rerun()
             
     with col_c3:
-        st.markdown("""
-        <div style="background-color: #f8f9fa; border: 2px solid #1F4E78; border-radius: 10px; padding: 18px; text-align: center; height: 175px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 3px 5px rgba(0,0,0,0.04); margin-bottom: 10px;">
-            <div>
-                <div style="font-size: 32px; margin-bottom: 6px;">🧪</div>
-                <h3 style="color: #1F4E78; margin: 0 0 6px 0; font-size: 16px;">Controle de Reatividade</h3>
-                <p style="font-size: 12px; color: #666; margin: 0; line-height: 1.3;">Ensaios DOC 0001/15, tempos de creme/gel e laudos executivos.</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        render_card("🧪", "Controle de Reatividade", "Ensaios DOC 0001/15, tempos de creme/gel e laudos executivos.")
         if st.button("Acessar Reatividade", use_container_width=True):
             st.session_state["menu_ativo"] = "reatividade"
             st.rerun()
 
     col_c4, col_c5, col_c6 = st.columns(3)
     with col_c4:
-        st.markdown("""
-        <div style="background-color: #f8f9fa; border: 2px solid #1F4E78; border-radius: 10px; padding: 18px; text-align: center; height: 175px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 3px 5px rgba(0,0,0,0.04); margin-bottom: 10px;">
-            <div>
-                <div style="font-size: 32px; margin-bottom: 6px;">🌡️</div>
-                <h3 style="color: #1F4E78; margin: 0 0 6px 0; font-size: 16px;">Controle Térmico</h3>
-                <p style="font-size: 12px; color: #666; margin: 0; line-height: 1.3;">Temperaturas diárias de moldes e estufas com gráficos e laudo Word.</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        render_card("🌡️", "Controle Térmico", "Temperaturas diárias de moldes e estufas com gráficos e laudo Word.")
         if st.button("Acessar Térmico", use_container_width=True):
             st.session_state["menu_ativo"] = "termico"
             st.rerun()
             
     with col_c5:
-        st.markdown("""
-        <div style="background-color: #f8f9fa; border: 2px solid #1F4E78; border-radius: 10px; padding: 18px; text-align: center; height: 175px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 3px 5px rgba(0,0,0,0.04); margin-bottom: 10px;">
-            <div>
-                <div style="font-size: 32px; margin-bottom: 6px;">📑</div>
-                <h3 style="color: #1F4E78; margin: 0 0 6px 0; font-size: 16px;">Inspeções Semanais</h3>
-                <p style="font-size: 12px; color: #666; margin: 0; line-height: 1.3;">Auditorias técnicas, pilares operacionais e banco de dados de laudos.</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        render_card("📑", "Inspeções Semanais", "Auditorias técnicas, pilares operacionais e banco de dados de laudos.")
         if st.button("Acessar Inspeções", use_container_width=True):
             st.session_state["menu_ativo"] = "inspecoes"
             st.rerun()
             
     with col_c6:
-        st.markdown("""
-        <div style="background-color: #f8f9fa; border: 2px solid #1F4E78; border-radius: 10px; padding: 18px; text-align: center; height: 175px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 3px 5px rgba(0,0,0,0.04); margin-bottom: 10px;">
-            <div>
-                <div style="font-size: 32px; margin-bottom: 6px;">⚠️</div>
-                <h3 style="color: #1F4E78; margin: 0 0 6px 0; font-size: 16px;">Registro de Anomalias</h3>
-                <p style="font-size: 12px; color: #666; margin: 0; line-height: 1.3;">Abertura de ocorrências, disparos de e-mail e Matriz 5W1H.</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        render_card("⚠️", "Registro de Anomalias", "Abertura de ocorrências, disparos de e-mail e Matriz 5W1H.")
         if st.button("Acessar Anomalias", use_container_width=True):
             st.session_state["menu_ativo"] = "anomalias"
             st.rerun()
