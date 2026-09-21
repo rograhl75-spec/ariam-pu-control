@@ -992,10 +992,13 @@ else:
                     df_anom.to_excel(arq_anomalias, index=False)
                     
                     try:
-                        smtp_server = "smtp.gmail.com"
-                        smtp_port = 587
-                        remetente_email = "Rograhl75@gmail.com"
-                        senha_app = "wrbf oqou loik cwkb"
+                        smtp_cfg = st.secrets.get("smtp", {})
+                        smtp_server = smtp_cfg.get("host", "smtp.gmail.com")
+                        smtp_port = int(smtp_cfg.get("port", 587))
+                        remetente_email = smtp_cfg.get("username", "")
+                        senha_app = smtp_cfg.get("password", "")
+                        if not remetente_email or not senha_app:
+                            raise ValueError("SMTP não configurado em st.secrets")
                         
                         msg = MIMEMultipart()
                         msg['From'] = remetente_email

@@ -1,6 +1,6 @@
-streamlit
-pandas
-requests
-python-docx
-openpyxl
-matplotlib
+streamlit==1.39.0
+pandas==2.2.3
+requests==2.32.3
+python-docx==1.1.2
+openpyxl==3.1.5
+matplotlib==3.9.2
