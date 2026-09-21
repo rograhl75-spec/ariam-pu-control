@@ -16,7 +16,7 @@ class DummySMTP:
     def __exit__(self, exc_type, exc, tb):
         return False
 
-    def starttls(self):
+    def starttls(self, context=None):
         return None
 
     def login(self, username, password):

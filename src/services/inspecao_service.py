@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.validators import validate_image
+from src.validators import validate_image, validate_image_upload
 
 
 class InspecaoService:
@@ -16,3 +16,8 @@ class InspecaoService:
         """Valida todas as imagens anexadas na inspeção."""
         for caminho in caminhos:
             validate_image(caminho)
+
+    def validar_uploads(self, arquivos: list) -> None:
+        """Valida uploads recebidos pelo `st.file_uploader`."""
+        for arquivo in arquivos:
+            validate_image_upload(arquivo.name, arquivo.size, arquivo.getvalue())

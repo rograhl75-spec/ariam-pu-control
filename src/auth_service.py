@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import hmac
+import secrets
 
 
 @dataclass(frozen=True)
@@ -22,8 +23,10 @@ class AuthService:
         self.users = users
 
     @staticmethod
-    def hash_password(password: str, salt: str = "ariam") -> str:
+    def hash_password(password: str, salt: str | None = None) -> str:
         """Gera hash determinístico no formato pbkdf2_sha256."""
+        if salt is None:
+            salt = secrets.token_hex(16)
         digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 260000).hex()
         return f"pbkdf2_sha256$260000${salt}${digest}"
 
@@ -32,13 +35,14 @@ class AuthService:
         """Verifica senha contra hash PBKDF2."""
         try:
             algorithm, rounds, salt, digest = stored_hash.split("$", 3)
+            rounds_int = int(rounds)
         except ValueError:
             return False
 
         if algorithm != "pbkdf2_sha256":
             return False
 
-        computed = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), int(rounds)).hex()
+        computed = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), rounds_int).hex()
         return hmac.compare_digest(computed, digest)
 
     def authenticate(self, username: str, password: str) -> AuthResult:

@@ -50,7 +50,13 @@ def _build_mail_settings() -> MailSettings | None:
     port = int(_secrets_get("smtp.port", os.getenv("SMTP_PORT", "587")))
     username = _secrets_get("smtp.username") or os.getenv("SMTP_USERNAME", "")
     smtp_secret = _secrets_get("smtp.password") or os.getenv("SMTP_PASSWORD", "")
-    use_tls = bool(_secrets_get("smtp.use_tls", True))
+    raw_use_tls = _secrets_get("smtp.use_tls", True)
+    if isinstance(raw_use_tls, bool):
+        use_tls = raw_use_tls
+    elif isinstance(raw_use_tls, str):
+        use_tls = raw_use_tls.strip().lower() in {"1", "true", "yes", "on"}
+    else:
+        use_tls = bool(raw_use_tls)
 
     if not username or not smtp_secret:
         raise ValueError("SMTP configurado sem username/password em st.secrets.")
@@ -64,12 +70,7 @@ def get_settings() -> Settings:
 
     users = _secrets_get("users", {})
     if not users:
-        users = {
-            "admin": {
-                "password_hash": "pbkdf2_sha256$260000$demo$6b41a8dbf95fbb2f6e3e95f3f8ecef1f907058d8f58c7f7562ef42f7518d3774",
-                "role": "admin",
-            }
-        }
+        raise ValueError("Nenhum usuário configurado em st.secrets (bloco [users]).")
 
     settings = Settings(
         db_path=db_path,

@@ -6,6 +6,7 @@ import json
 import sqlite3
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from src.storage.base import StorageRepository
 
@@ -66,12 +67,10 @@ class SQLiteRepository(StorageRepository):
         return [dict(row) for row in rows]
 
     def _next_occurrence_id(self) -> str:
-        with self._connect() as conn:
-            row = conn.execute("SELECT COUNT(1) AS total FROM occurrences").fetchone()
-        return f"OC-{int(row['total']) + 1:03d}"
+        return f"OC-{uuid4().hex[:8].upper()}"
 
     def create_occurrence(self, payload: dict[str, Any]) -> str:
-        """Cria ocorrência com número sequencial."""
+        """Cria ocorrência com identificador único."""
         occurrence_id = payload.get("id") or self._next_occurrence_id()
         with self._connect() as conn:
             conn.execute(

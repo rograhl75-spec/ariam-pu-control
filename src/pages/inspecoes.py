@@ -34,8 +34,7 @@ def render() -> None:
     repo = SQLiteRepository(get_settings().db_path)
     repo.init_schema()
     if st.button("Salvar inspeção"):
-        for photo in fotos or []:
-            service.validar_evidencias([photo.name])
+        service.validar_uploads(fotos or [])
         repo.save_measurement(
             "inspecao",
             {

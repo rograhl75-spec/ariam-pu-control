@@ -23,8 +23,14 @@ Aplicação Streamlit para controle de produção PU com arquitetura modular, pe
 ## Configuração
 
 1. Copie `.streamlit/secrets.example.toml` para `.streamlit/secrets.toml`
-2. Preencha credenciais e hashes
-3. Instale dependências:
+2. Gere hashes de senha:
+
+```bash
+python -c "from src.auth_service import AuthService; print(AuthService.hash_password('SUA_SENHA'))"
+```
+
+3. Preencha credenciais e hashes em `.streamlit/secrets.toml`
+4. Instale dependências:
 
 ```bash
 pip install -r requirements.txt
