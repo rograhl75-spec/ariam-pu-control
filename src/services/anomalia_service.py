@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from datetime import datetime
 
 from src.storage.base import StorageRepository
 
@@ -33,11 +34,15 @@ class AnomaliaService:
         """Retorna ocorrências pendentes vencidas."""
         vencidas = []
         for item in self.repository.list_occurrences():
-            due_date = item.get("due_date")
-            if not due_date:
+            due_date_raw = item.get("due_date")
+            if not due_date_raw:
                 continue
             if item.get("status", "").lower().startswith("concluído"):
                 continue
-            if due_date < hoje.isoformat():
+            try:
+                due_date = datetime.fromisoformat(due_date_raw).date()
+            except ValueError:
+                continue
+            if due_date < hoje:
                 vencidas.append(item)
         return vencidas

@@ -67,32 +67,43 @@ class SQLiteRepository(StorageRepository):
         return [dict(row) for row in rows]
 
     def _next_occurrence_id(self) -> str:
-        return f"OC-{uuid4().hex[:8].upper()}"
+        return f"OC-{uuid4().hex.upper()}"
 
     def create_occurrence(self, payload: dict[str, Any]) -> str:
         """Cria ocorrência com identificador único."""
-        occurrence_id = payload.get("id") or self._next_occurrence_id()
-        with self._connect() as conn:
-            conn.execute(
-                """
-                INSERT INTO occurrences
-                (id, created_at, opened_by, responsible_email, machine, problem, status, due_date, closed_by, data_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    occurrence_id,
-                    payload["created_at"],
-                    payload["opened_by"],
-                    payload.get("responsible_email"),
-                    payload["machine"],
-                    payload["problem"],
-                    payload.get("status", "Pendente Ação Corretiva"),
-                    payload.get("due_date"),
-                    payload.get("closed_by"),
-                    json.dumps(payload.get("details", {}), ensure_ascii=False),
-                ),
-            )
-        return occurrence_id
+        fixed_id = payload.get("id")
+        max_attempts = 5 if fixed_id is None else 1
+
+        for _ in range(max_attempts):
+            occurrence_id = fixed_id or self._next_occurrence_id()
+            try:
+                with self._connect() as conn:
+                    conn.execute(
+                        """
+                        INSERT INTO occurrences
+                        (id, created_at, opened_by, responsible_email, machine, problem, status, due_date, closed_by, data_json)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            occurrence_id,
+                            payload["created_at"],
+                            payload["opened_by"],
+                            payload.get("responsible_email"),
+                            payload["machine"],
+                            payload["problem"],
+                            payload.get("status", "Pendente Ação Corretiva"),
+                            payload.get("due_date"),
+                            payload.get("closed_by"),
+                            json.dumps(payload.get("details", {}), ensure_ascii=False),
+                        ),
+                    )
+                return occurrence_id
+            except sqlite3.IntegrityError:
+                if fixed_id is not None:
+                    raise
+                continue
+
+        raise RuntimeError("Falha ao gerar ID único para ocorrência.")
 
     def update_occurrence(self, occurrence_id: str, payload: dict[str, Any]) -> None:
         """Atualiza campos principais e detalhes JSON."""

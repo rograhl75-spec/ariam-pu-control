@@ -74,3 +74,20 @@ def test_processo_service_alerta_densidade_critico():
     )
     out = ProcessoService().process_dataframe(df, temperatura=25)
     assert out.loc[0, "Alerta_Densidade"] == "CRÍTICO"
+
+
+def test_processo_service_volume_zero_critico():
+    df = pd.DataFrame(
+        [
+            {
+                "Codigo_Item": "A1",
+                "Descricao": "Item teste",
+                "Volume": 0,
+                "Massa_Nominal": 2.0,
+                "Massa_Frio": 2.0,
+                "Massa_Calor": 2.0,
+            }
+        ]
+    )
+    out = ProcessoService().process_dataframe(df, temperatura=25)
+    assert out.loc[0, "Alerta_Densidade"] == "CRÍTICO"
