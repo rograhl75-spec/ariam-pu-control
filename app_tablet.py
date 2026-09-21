@@ -13,8 +13,8 @@ try:
     from docx.shared import Inches, Pt, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
     from docx.enum.table import WD_TABLE_ALIGNMENT
-    from docx.oxml import OxmlElement, parse_xml
-    from docx.oxml.ns import qn, nsdecls
+    from docx.oxml import parse_xml
+    from docx.oxml.ns import nsdecls
     DOCX_DISPONIVEL = True
 except ImportError:
     DOCX_DISPONIVEL = False
@@ -88,7 +88,7 @@ st.markdown("---")
 
 if not os.path.exists("Relatorio_Processo_Injecao_Atualizado.xlsx"):
     try:
-        import automacao_grahl
+        __import__("automacao_grahl")
     except Exception as e:
         st.error(f"Erro crítico ao gerar base de dados automática: {e}")
         st.stop()
@@ -98,7 +98,7 @@ def obter_temp():
     try:
         r = requests.get("https://api.open-meteo.com/v1/forecast?latitude=-23.31028&longitude=-51.16278&current_weather=true", timeout=4)
         return float(r.json()['current_weather']['temperature'])
-    except:
+    except Exception:
         return 24.0
 
 temp_externa = obter_temp()
@@ -133,7 +133,7 @@ def aplicar_estilo_abadi_e_espacamento(doc):
         try:
             doc.add_picture(logo_path, width=Inches(1.8))
             doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
-        except:
+        except Exception:
             pass
     style_normal = doc.styles['Normal']
     style_normal.font.name = 'Abadi'
@@ -395,7 +395,7 @@ else:
                 try:
                     df_log_p = pd.read_excel(arquivo_log_peso)
                     df_log_p = pd.concat([df_log_p, pd.DataFrame([novo_registro])], ignore_index=True)
-                except:
+                except Exception:
                     df_log_p = pd.DataFrame([novo_registro])
                 df_log_p.to_excel(arquivo_log_peso, index=False)
                 st.success(f"Pesagem registrada com sucesso! Desvio: {dif_gramas:+.1f} g.")
@@ -467,7 +467,7 @@ else:
                 try:
                     df_log_r = pd.read_excel(arquivo_log_reat)
                     df_log_r = pd.concat([df_log_r, pd.DataFrame([novo_reat])], ignore_index=True)
-                except:
+                except Exception:
                     df_log_r = pd.DataFrame([novo_reat])
                 df_log_r.to_excel(arquivo_log_reat, index=False)
                 st.success("Ensaio de reatividade salvo com sucesso!")
@@ -581,7 +581,7 @@ else:
                 try:
                     df_term_db = pd.read_excel(arq_db_term)
                     prox_id_term = f"TR-{len(df_term_db) + 1:03d}"
-                except:
+                except Exception:
                     df_term_db = pd.DataFrame()
                     prox_id_term = "TR-001"
 
@@ -629,7 +629,7 @@ else:
                         plt.tight_layout()
                         plt.savefig(caminho_grafico, dpi=200)
                         plt.close()
-                    except:
+                    except Exception:
                         pass
 
                 doc_t = Document()
@@ -659,7 +659,7 @@ else:
                     try:
                         doc_t.add_picture(caminho_grafico, width=Inches(5.5))
                         doc_t.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
-                    except:
+                    except Exception:
                         pass
 
                 doc_t.add_paragraph()
@@ -758,7 +758,7 @@ else:
             try:
                 df_db_insp = pd.read_excel(arq_db_insp)
                 proximo_id_insp = f"INS-{len(df_db_insp) + 1:03d}"
-            except:
+            except Exception:
                 df_db_insp = pd.DataFrame()
                 proximo_id_insp = "INS-001"
 
@@ -961,7 +961,7 @@ else:
                     try:
                         df_temp_id = pd.read_excel(arq_anomalias)
                         proximo_id = f"OC-{len(df_temp_id) + 1:03d}"
-                    except:
+                    except Exception:
                         proximo_id = "OC-001"
 
                     fuso_br = timezone(timedelta(hours=-3))
@@ -987,7 +987,7 @@ else:
                     try:
                         df_anom = pd.read_excel(arq_anomalias)
                         df_anom = pd.concat([df_anom, pd.DataFrame([novo_reg_anom])], ignore_index=True)
-                    except:
+                    except Exception:
                         df_anom = pd.DataFrame([novo_reg_anom])
                     df_anom.to_excel(arq_anomalias, index=False)
                     
