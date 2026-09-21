@@ -22,7 +22,7 @@ def render() -> None:
 
     termo = st.text_input("Busca textual (código/descrição)")
     if termo and {"Codigo_Item", "Descricao"}.issubset(df.columns):
-        mask = df["Codigo_Item"].astype(str).str.contains(termo, case=False, na=False) | df["Descricao"].astype(str).str.contains(termo, case=False, na=False)
+        mask = df["Codigo_Item"].astype(str).str.contains(termo, case=False, na=False, regex=False) | df["Descricao"].astype(str).str.contains(termo, case=False, na=False, regex=False)
         df = df.loc[mask]
 
     settings = get_settings()

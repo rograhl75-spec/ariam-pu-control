@@ -23,7 +23,9 @@ class EmailService:
         msg["To"] = to_email
 
         with smtplib.SMTP(self.settings.host, self.settings.port, timeout=15) as server:
+            server.ehlo()
             if self.settings.use_tls:
                 server.starttls(context=ssl.create_default_context())
+                server.ehlo()
             server.login(self.settings.username, self.settings.password)
             server.sendmail(self.settings.username, [to_email], msg.as_string())

@@ -8,7 +8,7 @@ import streamlit as st
 
 def _ensure_login() -> bool:
     """Garante autenticação básica via `st.secrets` já hashada."""
-    settings = get_settings()
+    settings = get_settings(require_users=True)
     st.session_state.setdefault("role", "operador")
 
     if st.session_state.get("authenticated"):

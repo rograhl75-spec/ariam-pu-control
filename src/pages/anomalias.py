@@ -48,27 +48,34 @@ def render() -> None:
             }
         )
 
-        if settings.mail and responsible_email:
-            EmailService(settings.mail).send_email(
-                responsible_email,
-                f"[ARIAM] Nova ocorrência {occurrence_id}",
-                f"Ocorrência {occurrence_id} aberta para máquina {machine}.\n\nProblema: {problem}",
-            )
-
-        laudo = RelatorioService().gerar_relatorio_ocorrencia(
-            f"Ocorrência {occurrence_id}",
-            {
-                "Problema": problem,
-                "5W1H": "\n".join([f"{k}: {v or 'Não informado'}" for k, v in details.items()]),
-            },
-        )
-        st.download_button(
-            "Baixar laudo",
-            data=laudo,
-            file_name=f"laudo_{occurrence_id}.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        )
         st.success(f"Ocorrência {occurrence_id} criada")
+
+        if settings.mail and responsible_email:
+            try:
+                EmailService(settings.mail).send_email(
+                    responsible_email,
+                    f"[ARIAM] Nova ocorrência {occurrence_id}",
+                    f"Ocorrência {occurrence_id} aberta para máquina {machine}.\n\nProblema: {problem}",
+                )
+            except Exception as exc:  # noqa: BLE001
+                st.warning(f"Ocorrência criada, mas o e-mail não foi enviado: {exc}")
+
+        try:
+            laudo = RelatorioService().gerar_relatorio_ocorrencia(
+                f"Ocorrência {occurrence_id}",
+                {
+                    "Problema": problem,
+                    "5W1H": "\n".join([f"{k}: {v or 'Não informado'}" for k, v in details.items()]),
+                },
+            )
+            st.download_button(
+                "Baixar laudo",
+                data=laudo,
+                file_name=f"laudo_{occurrence_id}.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        except Exception as exc:  # noqa: BLE001
+            st.warning(f"Ocorrência criada, mas o laudo não pôde ser gerado: {exc}")
 
     ocorrencias = repo.list_occurrences()
     if ocorrencias:

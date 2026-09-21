@@ -64,12 +64,12 @@ def _build_mail_settings() -> MailSettings | None:
     return MailSettings(host, port, username, smtp_secret, use_tls)
 
 
-def get_settings() -> Settings:
+def get_settings(require_users: bool = False) -> Settings:
     """Retorna configurações seguras e validadas."""
     db_path = Path(_secrets_get("database.path", "data/ariam_pu.db"))
 
     users = _secrets_get("users", {})
-    if not users:
+    if require_users and not users:
         raise ValueError("Nenhum usuário configurado em st.secrets (bloco [users]).")
 
     settings = Settings(
