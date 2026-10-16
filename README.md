@@ -81,6 +81,9 @@ as adições e remoções. Ao terminar, clique em
 `Log_Inspecoes_Semanais.xlsx` e incorporadas ao Word, na ordem da galeria.
 `Foto_Path` continua contendo a primeira foto por compatibilidade; registros
 antigos com apenas essa coluna continuam gerando laudo.
+Após salvar, o histórico seleciona automaticamente a inspeção recém-gravada:
+o botão de download oferece o laudo dessa inspeção, com todas as fotos anexadas,
+e não o de uma inspeção anterior. Para baixar outro laudo, altere o ID no histórico.
 Mantenha a pasta de fotos junto à planilha para regenerar laudos posteriormente.
 No app modular (`app.py`), **Salvar inspeção** grava os nomes e os caminhos
 no SQLite, os bytes em `fotos_inspecoes/` junto ao banco, e disponibiliza

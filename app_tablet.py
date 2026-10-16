@@ -826,7 +826,7 @@ else:
 
             df_db_insp = pd.concat([df_db_insp, pd.DataFrame([novo_reg_insp])], ignore_index=True)
             df_db_insp.to_excel(arq_db_insp, index=False)
-            st.session_state["ultimo_insp_id"] = proximo_id_insp
+            st.session_state["select_id_insp_banco"] = proximo_id_insp
             st.session_state["inspecao_salva"] = proximo_id_insp
             reset_photo_evidence("foto_insp")
             st.rerun()

@@ -33,6 +33,13 @@ def make_upload(name="camera.jpg", fmt="JPEG", color="red"):
     )
 
 
+def embedded_photos(document):
+    return [
+        document.part.related_parts[shape._inline.graphic.graphicData.pic.blipFill.blip.embed].blob
+        for shape in document.inline_shapes
+    ]
+
+
 def mock_capture(monkeypatch, capture):
     response = {}
 
@@ -153,7 +160,7 @@ def test_modular_persists_all_photos_and_report(tmp_path, monkeypatch, source):
 
     db_path = tmp_path / "inspections.db"
     monkeypatch.setattr(inspecoes, "get_settings", lambda: SimpleNamespace(db_path=db_path))
-    uploads = [make_upload("primeira.jpg"), make_upload("segunda.png", "PNG")]
+    uploads = [make_upload("primeira.jpg"), make_upload("segunda.png", "PNG", "blue")]
     capture = make_upload("camera.jpg")
     mock_uploads(monkeypatch, uploads)
     mock_capture(monkeypatch, capture)
@@ -170,7 +177,12 @@ def test_modular_persists_all_photos_and_report(tmp_path, monkeypatch, source):
     assert payload["fotos"] == [prepare_photo(photo).name for photo in selected]
     assert [Path(path).read_bytes() for path in payload["foto_paths"]] == [prepare_photo(photo).content for photo in selected]
     document = Document(BytesIO(app.session_state["inspecao_laudo"]))
-    assert len(document.inline_shapes) == len(selected)
+    expected = [prepare_photo(photo).content for photo in selected]
+    assert embedded_photos(document) == expected
+    saved = inspecoes.SQLiteRepository(db_path).list_measurements("inspecao")[0]
+    assert saved["foto_paths"] == payload["foto_paths"]
+    regenerated = inspecoes.RelatorioService().gerar_relatorio_inspecao(saved["status"], saved["foto_paths"])
+    assert embedded_photos(Document(BytesIO(regenerated))) == expected
     assert app.session_state["inspecao_photos"] == []
 
 
@@ -270,6 +282,46 @@ def test_legacy_form_preview_save_and_word(tmp_path, monkeypatch, source):
     assert len(rows) == 2
     assert pd.isna(rows.iloc[1]["Foto_Path"])
     assert json.loads(rows.iloc[1]["Foto_Paths"]) == []
+
+    # O laudo oferecido após salvar deve ser da nova inspeção, não do histórico anterior.
+    if source == FILE_SOURCE:
+        app.radio(key="foto_insp_source").set_value(FILE_SOURCE).run()
+    selected = [
+        make_upload("foto.jpg", color="yellow"),
+        make_upload("foto.jpg", color="blue"),
+        make_upload("foto.jpg", color="green"),
+    ]
+    revision = app.session_state["foto_insp_upload_revision"]
+    mock_uploads(monkeypatch, selected, revision=revision)
+    app.run()
+    click(app, "Adicionar evidências à inspeção")
+    click(app, "Salvar Inspeção e Gerar Laudo Técnico")
+    rows = pd.read_excel(tmp_path / "Log_Inspecoes_Semanais.xlsx")
+    paths = json.loads(rows.iloc[2]["Foto_Paths"])
+    expected = [prepare_photo(photo).content for photo in selected]
+    assert len(set(paths)) == 3
+    assert [(tmp_path / path).read_bytes() for path in paths] == expected
+    assert rows.iloc[2]["Foto_Path"] == paths[0]
+    assert app.selectbox(key="select_id_insp_banco").value == "INS-003"
+    assert embedded_photos(documents[-1]) == expected
+    assert any("INS-003" in button.proto.label for button in app.get("download_button"))
+    app.run()
+    assert len(documents[-1].inline_shapes) == 3
+
+    # O histórico permanece navegável, inclusive após novos reruns.
+    app.selectbox(key="select_id_insp_banco").set_value("INS-001").run()
+    assert not app.exception
+    assert len(documents[-1].inline_shapes) == 2
+    app.run()
+    assert app.selectbox(key="select_id_insp_banco").value == "INS-001"
+
+    # Registros anteriores à coleção JSON continuam usando a foto única.
+    first_path = json.loads(rows.iloc[0]["Foto_Paths"])[0]
+    rows.loc[0, "Foto_Paths"] = float("nan")
+    rows.to_excel(tmp_path / "Log_Inspecoes_Semanais.xlsx", index=False)
+    app.run()
+    assert not app.exception
+    assert embedded_photos(documents[-1]) == [(tmp_path / first_path).read_bytes()]
 
 
 def test_gallery_accumulates_mixed_sources_removes_and_clears(monkeypatch):
