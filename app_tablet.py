@@ -751,7 +751,7 @@ else:
             "Krauss Maffei 80/80 (Cabeçote 2)"
         ], key="insp_maquina_select")
         
-        with st.form("form_inspecao_semana"):
+        with st.container():
             st.markdown("### 2️⃣ Identificação da Auditoria")
             c_insp1, c_insp2 = st.columns(2)
             with c_insp1:
@@ -786,11 +786,11 @@ else:
             st.markdown("### 4️⃣ Anexo de Evidência Fotográfica & Conclusão")
             fotos = render_photo_evidence("foto_insp")
             st.caption("Após escolher a origem e a foto, confira a prévia antes de salvar.")
-            st.form_submit_button("Conferir prévia da foto")
+            st.button("Conferir prévia da foto")
             insp_fotos_desc = st.text_area("Registro Descritivo das Evidências Visuais:", placeholder="Descreva os pontos inspecionados visualmente...")
             insp_conclusao = st.text_area("Conclusão Executiva & Recomendações Técnicas:", placeholder="Diretrizes gerais para a gestão desta máquina...")
 
-            btn_gerar_relatorio = st.form_submit_button("Salvar Inspeção e Gerar Laudo Técnico")
+            btn_gerar_relatorio = st.button("Salvar Inspeção e Gerar Laudo Técnico")
 
         if btn_gerar_relatorio and fotos is not None:
             arq_db_insp = "Log_Inspecoes_Semanais.xlsx"
