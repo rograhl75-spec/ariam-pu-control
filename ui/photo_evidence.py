@@ -85,18 +85,37 @@ def reset_photo_evidence(key: str) -> None:
     _reset_camera(key)
 
 
+def _add_photos(key: str, source: str, selected: list, revision: int) -> None:
+    """Executa antes do render para preservar os widgets abaixo da galeria."""
+    photos = st.session_state[f"{key}_photos"]
+    try:
+        if len(photos) + len(selected) > MAX_PHOTOS:
+            raise ValueError(f"Máximo de {MAX_PHOTOS} fotos. Remova fotos ou selecione menos arquivos")
+        prepared = [prepare_photo(photo) for photo in selected]
+    except ValueError as exc:
+        st.session_state[f"{key}_error"] = str(exc)
+        return
+    photos.extend(prepared)
+    if source == FILE_SOURCE:
+        st.session_state[f"{key}_upload_revision"] = revision + 1
+    else:
+        _reset_camera(key)
+
+
 def render_photo_evidence(key: str) -> list[Photo] | None:
     """Retorna fotos validadas; None indica erro que deve impedir o salvamento."""
     photos = st.session_state.setdefault(f"{key}_photos", [])
     st.caption(f"Evidências anexadas: {len(photos)}/{MAX_PHOTOS}. Limite de 5 MiB por imagem, inclusive após conversão para PNG.")
     for index, photo in enumerate(photos):
         st.image(photo.content, caption=f"Evidência {index + 1}: {photo.name}", width=240)
-        if st.button(f"Remover foto {index + 1}", key=f"{key}_remove_{index}"):
-            photos.pop(index)
-            st.rerun()
-    if st.button("Limpar evidências", key=f"{key}_clear", disabled=not photos):
-        reset_photo_evidence(key)
-        st.rerun()
+        st.button(
+            f"Remover foto {index + 1}", key=f"{key}_remove_{index}",
+            on_click=photos.pop, args=(index,),
+        )
+    st.button(
+        "Limpar evidências", key=f"{key}_clear", disabled=not photos,
+        on_click=reset_photo_evidence, args=(key,),
+    )
 
     source = st.radio(
         "Origem da evidência fotográfica",
@@ -128,18 +147,16 @@ def render_photo_evidence(key: str) -> list[Photo] | None:
     try:
         capture = render_rear_camera(key, active=source == CAMERA_SOURCE and len(photos) < MAX_PHOTOS)
         selected = select_photos(source, uploads, capture)
-        if st.button("Adicionar evidências à inspeção", key=f"{key}_add", disabled=not selected):
-            if len(photos) + len(selected) > MAX_PHOTOS:
-                raise ValueError(f"Máximo de {MAX_PHOTOS} fotos. Remova fotos ou selecione menos arquivos")
-            prepared = [prepare_photo(photo) for photo in selected]
-            photos.extend(prepared)
-            if source == FILE_SOURCE:
-                st.session_state[f"{key}_upload_revision"] = revision + 1
-            else:
-                _reset_camera(key)
-            st.rerun()
+        st.button(
+            "Adicionar evidências à inspeção", key=f"{key}_add", disabled=not selected,
+            on_click=_add_photos, args=(key, source, selected, revision),
+        )
     except ValueError as exc:
         st.error(f"Foto inválida: {exc}. Remova ou substitua a imagem da origem ativa.")
+        return None
+    error = st.session_state.pop(f"{key}_error", None)
+    if error:
+        st.error(f"Foto inválida: {error}. Remova ou substitua a imagem da origem ativa.")
         return None
     if selected:
         st.warning("Há fotos pendentes. Adicione-as à inspeção ou descarte a seleção antes de salvar.")

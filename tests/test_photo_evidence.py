@@ -126,9 +126,7 @@ def test_render_invalid_active_photo_blocks_save(monkeypatch):
     ui.radio.return_value = CAMERA_SOURCE
     ui.file_uploader.return_value = []
     ui.button.side_effect = lambda label, **kwargs: label == "Adicionar evidências à inspeção"
-    monkeypatch.setattr(photo_evidence, "render_rear_camera", lambda *a, **k: (
-        SimpleNamespace(name="camera.jpg", getvalue=lambda: b"invalid")
-    ))
+    monkeypatch.setattr(photo_evidence, "render_rear_camera", Mock(side_effect=ValueError("Captura inválida")))
     monkeypatch.setattr(photo_evidence, "st", ui)
     assert photo_evidence.render_photo_evidence("test") is None
     ui.error.assert_called_once()
@@ -222,9 +220,13 @@ def test_legacy_form_preview_save_and_word(tmp_path, monkeypatch, source):
     app.run()
     assert not app.exception
     next(field for field in app.text_area if field.label == "Observações de Manutenção:").set_value("Mantido na prévia")
+    next(field for field in app.text_area if field.label == "Registro Descritivo das Evidências Visuais:").set_value("Todas as fotos do equipamento")
+    next(field for field in app.text_area if field.label == "Conclusão Executiva & Recomendações Técnicas:").set_value("Conclusão preservada")
     app.run()
     app.radio(key="foto_insp_source").set_value(source).run()
     assert next(field for field in app.text_area if field.label == "Observações de Manutenção:").value == "Mantido na prévia"
+    assert next(field for field in app.text_area if field.label == "Registro Descritivo das Evidências Visuais:").value == "Todas as fotos do equipamento"
+    assert next(field for field in app.text_area if field.label == "Conclusão Executiva & Recomendações Técnicas:").value == "Conclusão preservada"
     click(app, "Adicionar evidências à inspeção")
     assert not app.exception
     assert not (tmp_path / "Log_Inspecoes_Semanais.xlsx").exists()
@@ -246,6 +248,8 @@ def test_legacy_form_preview_save_and_word(tmp_path, monkeypatch, source):
     assert row["Foto_Path"] == paths[0]
     assert [(tmp_path / path).read_bytes() for path in paths] == [prepare_photo(photo).content for photo in selected]
     assert row["Manutenção Obs"] == "Mantido na prévia"
+    assert row["Evidências Desc"] == "Todas as fotos do equipamento"
+    assert row["Conclusão"] == "Conclusão preservada"
     report = BytesIO()
     documents[-1].save(report)
     with ZipFile(report) as archive:
@@ -277,7 +281,12 @@ def test_gallery_accumulates_mixed_sources_removes_and_clears(monkeypatch):
         "from ui.photo_evidence import render_photo_evidence\n"
         "photos = render_photo_evidence('photo')\n"
         "st.session_state['ready'] = photos\n"
+        "st.text_area('Descrição')\n"
+        "st.text_area('Conclusão')\n"
     ).run()
+    app.text_area[0].set_value("Descrição mantida")
+    app.text_area[1].set_value("Conclusão mantida")
+    app.run()
     assert app.session_state["ready"] is None
     click(app, "Adicionar evidências à inspeção")
     assert len(app.session_state["ready"]) == 2
@@ -297,6 +306,8 @@ def test_gallery_accumulates_mixed_sources_removes_and_clears(monkeypatch):
     assert app.session_state["ready"] == []
     app.run()
     assert app.session_state["ready"] == []
+    assert app.text_area[0].value == "Descrição mantida"
+    assert app.text_area[1].value == "Conclusão mantida"
 
 
 def test_upload_addition_is_atomic_and_limit_preserves_existing_photos(monkeypatch):
