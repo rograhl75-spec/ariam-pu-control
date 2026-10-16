@@ -56,6 +56,20 @@ def test_prepare_photo_applies_camera_orientation():
         assert normalized.size == (4, 8)
 
 
+def test_prepare_photo_preserves_transparent_png_evidence():
+    image = Image.new("RGBA", (2, 1), (0, 0, 0, 0))
+    image.putpixel((1, 0), (0, 0, 0, 255))
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    photo = prepare_photo(SimpleNamespace(name="evidencia.png", getvalue=buffer.getvalue))
+    with Image.open(BytesIO(photo.content)) as normalized:
+        assert normalized.getpixel((0, 0)) == (0, 0, 0, 0)
+        assert normalized.getpixel((1, 0)) == (0, 0, 0, 255)
+    document = Document()
+    document.add_picture(BytesIO(photo.content))
+    assert len(document.inline_shapes) == 1
+
+
 @pytest.mark.parametrize("content", [b"", b"not-an-image", b"x" * (5 * 1024 * 1024 + 1)])
 def test_prepare_photo_rejects_invalid_or_oversized_bytes(content):
     with pytest.raises(ValueError):

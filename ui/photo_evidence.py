@@ -28,7 +28,9 @@ def prepare_photo(upload) -> Photo:
         with Image.open(BytesIO(content)) as image:
             if image.format not in {"JPEG", "PNG", "WEBP"}:
                 raise ValueError("Formato de imagem inválido")
-            normalized = ImageOps.exif_transpose(image).convert("RGB")
+            normalized = ImageOps.exif_transpose(image)
+            has_alpha = "A" in normalized.getbands() or "transparency" in normalized.info
+            normalized = normalized.convert("RGBA" if has_alpha else "RGB")
             output = BytesIO()
             normalized.save(output, format="PNG")
     except (OSError, Image.DecompressionBombError) as exc:
