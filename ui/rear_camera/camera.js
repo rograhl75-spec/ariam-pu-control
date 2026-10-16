@@ -157,7 +157,7 @@
       el("preview").src = data;
       el("preview").hidden = false;
       el("clear").hidden = false;
-      status("Foto capturada. Confira a prévia da evidência antes de salvar. Uma nova captura substitui esta foto.");
+      status("Foto capturada. Toque em 'Adicionar evidências à inspeção' para mantê-la na galeria e continuar capturando. Uma nova captura substitui apenas esta prévia pendente.");
       value("photo", data);
     } catch (_) {
       stop();
@@ -172,7 +172,7 @@
   el("clear").addEventListener("click", () => {
     stop();
     clearPhoto();
-    status("Foto removida. Capture novamente ou selecione 'Enviar arquivo'.");
+    status("Captura pendente descartada. As fotos já anexadas à inspeção foram mantidas.");
     value("empty");
   });
   window.addEventListener("message", event => {

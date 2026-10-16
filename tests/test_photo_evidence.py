@@ -34,11 +34,29 @@ def make_upload(name="camera.jpg", fmt="JPEG", color="red"):
 
 
 def mock_capture(monkeypatch, capture):
-    monkeypatch.setattr(rear_camera, "_component", lambda **kwargs: {
-        "session": kwargs["session"],
-        "status": "photo" if capture else "empty",
-        "data": "data:image/jpeg;base64," + base64.b64encode(capture.getvalue()).decode() if capture else None,
-    })
+    response = {}
+
+    def component(**kwargs):
+        if kwargs["active"] and not response:
+            response.update({
+                "session": kwargs["session"],
+                "status": "photo" if capture else "empty",
+                "data": "data:image/jpeg;base64," + base64.b64encode(capture.getvalue()).decode() if capture else None,
+            })
+        return response or None
+
+    monkeypatch.setattr(rear_camera, "_component", component)
+
+
+def click(app, label):
+    next(button for button in app.button if button.label == label).click().run()
+    assert not app.exception
+
+
+def mock_uploads(monkeypatch, uploads, revision=0):
+    import streamlit as st
+
+    monkeypatch.setattr(st, "file_uploader", lambda *a, **k: uploads if k["key"].endswith(f"_{revision}") else [])
 
 
 @pytest.mark.parametrize("fmt, name", [("JPEG", "camera.jpg"), ("PNG", "arquivo.png"), ("WEBP", "foto.webp")])
@@ -85,6 +103,12 @@ def test_prepare_photo_rejects_invalid_or_oversized_bytes(content):
         prepare_photo(SimpleNamespace(name="foto.png", getvalue=lambda: content))
 
 
+def test_prepare_photo_limits_normalized_size(monkeypatch):
+    monkeypatch.setattr(photo_evidence, "MAX_PHOTO_BYTES", 10)
+    with pytest.raises(ValueError, match="normalizada"):
+        prepare_photo(make_upload())
+
+
 def test_source_switch_never_falls_back_to_other_source():
     upload, capture = make_upload(), make_upload()
     assert select_photos(FILE_SOURCE, [upload], capture) == [upload]
@@ -98,8 +122,10 @@ def test_source_switch_never_falls_back_to_other_source():
 
 def test_render_invalid_active_photo_blocks_save(monkeypatch):
     ui = Mock()
+    ui.session_state = {}
     ui.radio.return_value = CAMERA_SOURCE
-    ui.file_uploader.return_value = make_upload()
+    ui.file_uploader.return_value = []
+    ui.button.side_effect = lambda label, **kwargs: label == "Adicionar evidências à inspeção"
     monkeypatch.setattr(photo_evidence, "render_rear_camera", lambda *a, **k: (
         SimpleNamespace(name="camera.jpg", getvalue=lambda: b"invalid")
     ))
@@ -124,31 +150,53 @@ def test_camera_component_and_uploader_render():
 
 
 @pytest.mark.parametrize("source", [FILE_SOURCE, CAMERA_SOURCE])
-def test_modular_saves_only_active_source_names(tmp_path, monkeypatch, source):
-    import streamlit as st
+def test_modular_persists_all_photos_and_report(tmp_path, monkeypatch, source):
     from src.pages import inspecoes
 
     db_path = tmp_path / "inspections.db"
     monkeypatch.setattr(inspecoes, "get_settings", lambda: SimpleNamespace(db_path=db_path))
     uploads = [make_upload("primeira.jpg"), make_upload("segunda.png", "PNG")]
     capture = make_upload("camera.jpg")
-    monkeypatch.setattr(st, "file_uploader", lambda *a, **k: uploads)
+    mock_uploads(monkeypatch, uploads)
     mock_capture(monkeypatch, capture)
     app = AppTest.from_string("from src.pages.inspecoes import render\nrender()").run()
     app.radio(key="inspecao_source").set_value(source).run()
-    next(button for button in app.button if button.label == "Salvar inspeção").click().run()
-    assert not app.exception
+    click(app, "Adicionar evidências à inspeção")
+    selected = uploads if source == FILE_SOURCE else [capture]
+    assert len(app.session_state["inspecao_photos"]) == len(selected)
+    if source == CAMERA_SOURCE:
+        mock_uploads(monkeypatch, [])
+    click(app, "Salvar inspeção")
     with sqlite3.connect(db_path) as connection:
         payload = json.loads(connection.execute("SELECT data_json FROM measurements").fetchone()[0])
-    selected = uploads if source == FILE_SOURCE else [capture]
     assert payload["fotos"] == [prepare_photo(photo).name for photo in selected]
+    assert [Path(path).read_bytes() for path in payload["foto_paths"]] == [prepare_photo(photo).content for photo in selected]
+    document = Document(BytesIO(app.session_state["inspecao_laudo"]))
+    assert len(document.inline_shapes) == len(selected)
+    assert app.session_state["inspecao_photos"] == []
+
+
+def test_save_keeps_evidence_when_persistence_fails(tmp_path, monkeypatch):
+    from src.pages import inspecoes
+
+    monkeypatch.setattr(inspecoes, "get_settings", lambda: SimpleNamespace(db_path=tmp_path / "inspection.db"))
+    mock_uploads(monkeypatch, [make_upload(), make_upload(color="blue")])
+    app = AppTest.from_string("from src.pages.inspecoes import render\nrender()").run()
+    click(app, "Salvar inspeção")
+    with sqlite3.connect(tmp_path / "inspection.db") as connection:
+        assert connection.execute("SELECT count(*) FROM measurements").fetchone()[0] == 0
+    click(app, "Adicionar evidências à inspeção")
+    original = list(app.session_state["inspecao_photos"])
+    monkeypatch.setattr(inspecoes.SQLiteRepository, "save_measurement", Mock(side_effect=OSError("disco indisponível")))
+    next(button for button in app.button if button.label == "Salvar inspeção").click().run()
+    assert app.exception
+    assert app.session_state["inspecao_photos"] == original
 
 
 @pytest.mark.parametrize("source", [FILE_SOURCE, CAMERA_SOURCE])
 def test_legacy_form_preview_save_and_word(tmp_path, monkeypatch, source):
     import docx
     import requests
-    import streamlit as st
 
     monkeypatch.chdir(tmp_path)
     base = "Relatorio_Processo_Injecao_Atualizado.xlsx"
@@ -156,9 +204,9 @@ def test_legacy_form_preview_save_and_word(tmp_path, monkeypatch, source):
     monkeypatch.setattr(requests, "get", lambda *a, **k: SimpleNamespace(
         json=lambda: {"current_weather": {"temperature": 24}}
     ))
-    upload = make_upload("arquivo.png", "PNG", "blue")
+    uploads = [make_upload("arquivo.png", "PNG", "blue"), make_upload("segunda.jpg", color="green")]
     capture = make_upload()
-    monkeypatch.setattr(st, "file_uploader", lambda *a, **k: upload)
+    mock_uploads(monkeypatch, uploads)
     mock_capture(monkeypatch, capture)
     documents = []
 
@@ -177,32 +225,113 @@ def test_legacy_form_preview_save_and_word(tmp_path, monkeypatch, source):
     app.run()
     app.radio(key="foto_insp_source").set_value(source).run()
     assert next(field for field in app.text_area if field.label == "Observações de Manutenção:").value == "Mantido na prévia"
-    next(button for button in app.button if button.label == "Conferir prévia da foto").click().run()
+    click(app, "Adicionar evidências à inspeção")
     assert not app.exception
     assert not (tmp_path / "Log_Inspecoes_Semanais.xlsx").exists()
     assert next(field for field in app.text_area if field.label == "Observações de Manutenção:").value == "Mantido na prévia"
-    next(button for button in app.button if button.label == "Salvar Inspeção e Gerar Laudo Técnico").click().run()
-    assert not app.exception
+    selected = [capture] if source == CAMERA_SOURCE else uploads
+    if source == CAMERA_SOURCE:
+        second_capture = make_upload(color="yellow")
+        mock_capture(monkeypatch, second_capture)
+        app.run()
+        click(app, "Adicionar evidências à inspeção")
+        selected.append(second_capture)
+        mock_uploads(monkeypatch, [])
+    app.run()
+    assert len(app.session_state["foto_insp_photos"]) == 2
+    click(app, "Salvar Inspeção e Gerar Laudo Técnico")
     row = pd.read_excel(tmp_path / "Log_Inspecoes_Semanais.xlsx").iloc[0]
-    selected = capture if source == CAMERA_SOURCE else upload
-    assert (tmp_path / row["Foto_Path"]).read_bytes() == prepare_photo(selected).content
+    paths = json.loads(row["Foto_Paths"])
+    assert len(paths) == 2
+    assert row["Foto_Path"] == paths[0]
+    assert [(tmp_path / path).read_bytes() for path in paths] == [prepare_photo(photo).content for photo in selected]
     assert row["Manutenção Obs"] == "Mantido na prévia"
     report = BytesIO()
     documents[-1].save(report)
     with ZipFile(report) as archive:
         media = [name for name in archive.namelist() if name.startswith("word/media/")]
-        assert len(media) == 1
-        assert archive.read(media[0]) == prepare_photo(selected).content
+        assert len(media) == 2
+        assert {archive.read(path) for path in media} == {prepare_photo(photo).content for photo in selected}
+    assert len(documents[-1].inline_shapes) == 2
+    assert app.session_state["foto_insp_photos"] == []
 
-    # A foto antiga da outra origem não deve reaparecer ao salvar sem imagem.
+    # Uma nova inspeção não deve reutilizar as evidências já salvas.
     if source == CAMERA_SOURCE:
-        monkeypatch.setattr(st, "file_uploader", lambda *a, **k: None)
-        app.radio(key="foto_insp_source").set_value(FILE_SOURCE)
+        app.radio(key="foto_insp_source").set_value(FILE_SOURCE).run()
     else:
         mock_capture(monkeypatch, None)
-        app.radio(key="foto_insp_source").set_value(CAMERA_SOURCE)
-    next(button for button in app.button if button.label == "Salvar Inspeção e Gerar Laudo Técnico").click().run()
-    assert not app.exception
+        app.radio(key="foto_insp_source").set_value(CAMERA_SOURCE).run()
+    click(app, "Salvar Inspeção e Gerar Laudo Técnico")
     rows = pd.read_excel(tmp_path / "Log_Inspecoes_Semanais.xlsx")
     assert len(rows) == 2
     assert pd.isna(rows.iloc[1]["Foto_Path"])
+    assert json.loads(rows.iloc[1]["Foto_Paths"]) == []
+
+
+def test_gallery_accumulates_mixed_sources_removes_and_clears(monkeypatch):
+    uploads = [make_upload("primeira.jpg"), make_upload("segunda.jpg", color="blue")]
+    mock_uploads(monkeypatch, uploads)
+    mock_capture(monkeypatch, make_upload(color="green"))
+    app = AppTest.from_string(
+        "import streamlit as st\n"
+        "from ui.photo_evidence import render_photo_evidence\n"
+        "photos = render_photo_evidence('photo')\n"
+        "st.session_state['ready'] = photos\n"
+    ).run()
+    assert app.session_state["ready"] is None
+    click(app, "Adicionar evidências à inspeção")
+    assert len(app.session_state["ready"]) == 2
+    app.radio[0].set_value(CAMERA_SOURCE).run()
+    click(app, "Adicionar evidências à inspeção")
+    assert len(app.session_state["ready"]) == 3
+    original = list(app.session_state["ready"])
+    app.run()
+    app.radio[0].set_value(FILE_SOURCE).run()
+    app.radio[0].set_value(CAMERA_SOURCE).run()
+    assert app.session_state["ready"] == original
+    click(app, "Remover foto 2")
+    assert app.session_state["ready"] == [original[0], original[2]]
+    app.run()
+    assert len(app.session_state["ready"]) == 2
+    click(app, "Limpar evidências")
+    assert app.session_state["ready"] == []
+    app.run()
+    assert app.session_state["ready"] == []
+
+
+def test_upload_addition_is_atomic_and_limit_preserves_existing_photos(monkeypatch):
+    import streamlit as st
+
+    mock_uploads(monkeypatch, [make_upload(), SimpleNamespace(name="bad.png", getvalue=lambda: b"invalid")])
+    app = AppTest.from_string(
+        "from ui.photo_evidence import render_photo_evidence\nrender_photo_evidence('photo')"
+    ).run()
+    click(app, "Adicionar evidências à inspeção")
+    assert app.error
+    assert app.session_state["photo_photos"] == []
+    photos = [prepare_photo(make_upload())] * photo_evidence.MAX_PHOTOS
+    app.session_state["photo_photos"] = photos
+    monkeypatch.setattr(st, "file_uploader", lambda *a, **k: [make_upload()])
+    app.run()
+    click(app, "Adicionar evidências à inspeção")
+    assert app.error
+    assert app.session_state["photo_photos"] == photos
+    assert any("Remova fotos" in warning.value for warning in app.warning)
+
+
+@pytest.mark.parametrize("record, expected", [
+    ({"Foto_Path": "antiga.png"}, ["antiga.png"]),
+    ({"Foto_Path": float("nan"), "Foto_Paths": float("nan")}, []),
+    ({"Foto_Path": "primeira.png", "Foto_Paths": '["primeira.png", "segunda.png"]'}, ["primeira.png", "segunda.png"]),
+    ({"Foto_Path": "antiga.png", "Foto_Paths": "[]"}, []),
+])
+def test_photo_paths_reads_old_and_new_excel_records(record, expected):
+    assert photo_evidence.photo_paths(record) == expected
+
+
+def test_save_photos_does_not_overwrite_same_name(tmp_path):
+    photos = [prepare_photo(make_upload()), prepare_photo(make_upload(color="blue"))]
+    paths = photo_evidence.save_photos(photos, tmp_path)
+    more_paths = photo_evidence.save_photos(photos, tmp_path)
+    assert len(set(paths + more_paths)) == 4
+    assert [Path(path).read_bytes() for path in paths] == [photo.content for photo in photos]
