@@ -81,10 +81,37 @@ as adições e remoções. Ao terminar, clique em
 `Log_Inspecoes_Semanais.xlsx` e incorporadas ao Word, na ordem da galeria.
 `Foto_Path` continua contendo a primeira foto por compatibilidade; registros
 antigos com apenas essa coluna continuam gerando laudo.
+Após salvar, o histórico seleciona automaticamente o ID recém-gravado; o
+download deve corresponder àquela inspeção e conter **todas as imagens
+anexadas, na ordem da galeria**, inclusive anexos com nomes ou conteúdos iguais.
+Cada imagem recebe a legenda **Evidência N de Total**. Para baixar outra
+inspeção, altere o ID no histórico.
+Se uma imagem estiver ausente ou inválida, o download do laudo legado será
+bloqueado com a identificação das evidências indisponíveis, em vez de oferecer
+um documento parcial. A lista salva não é alterada: restaure os arquivos
+originais nos caminhos registrados e gere novamente.
 Mantenha a pasta de fotos junto à planilha para regenerar laudos posteriormente.
 No app modular (`app.py`), **Salvar inspeção** grava os nomes e os caminhos
 no SQLite, os bytes em `fotos_inspecoes/` junto ao banco, e disponibiliza
 **Baixar laudo da última inspeção**, com todas as imagens.
+
+**Diagnóstico e cobertura da correção:** a PR #7 tratava a seleção da inspeção,
+mas essa alteração ainda não estava no código-base desta sessão: o salvamento
+atualizava `ultimo_insp_id`, não o seletor `select_id_insp_banco`. Assim, após
+salvar, o download podia continuar apontando para uma inspeção anterior com
+uma única foto. O renderizador já percorria `Foto_Paths`, mas também permitia
+baixar laudos parciais quando algum arquivo falhava. A correção atualiza o
+seletor e impede essa exportação incompleta. Os testes exercitam câmera e
+upload nos dois aplicativos, releitura de Excel/SQLite, conteúdo e ordem das
+imagens no DOCX, anexos repetidos sem sobrescrita, inspeções consecutivas,
+navegação pelo histórico, `Foto_Path` legado e recuperação de arquivos ausentes
+ou inválidos. Não foi identificado truncamento das listas na persistência.
+
+**Limitações:** fotos cujo arquivo já foi perdido não podem ser reconstruídas
+pela lista de caminhos; precisam ser restauradas de uma cópia de segurança.
+O laudo é exportado em Word (.docx), não em PDF. Os testes de câmera usam
+simulação; a câmera física e a exibição do documento no Word do tablet/desktop
+devem ser conferidas no roteiro manual abaixo.
 
 O limite é de **20 fotos por inspeção** e **5 MiB por imagem**, tanto no arquivo
 de entrada quanto no PNG normalizado. Câmera e upload passam pela mesma
