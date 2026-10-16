@@ -33,6 +33,13 @@ def make_upload(name="camera.jpg", fmt="JPEG", color="red"):
     )
 
 
+def embedded_photos(document):
+    return [
+        document.part.related_parts[shape._inline.graphic.graphicData.pic.blipFill.blip.embed].blob
+        for shape in document.inline_shapes
+    ]
+
+
 def mock_capture(monkeypatch, capture):
     response = {}
 
@@ -153,7 +160,7 @@ def test_modular_persists_all_photos_and_report(tmp_path, monkeypatch, source):
 
     db_path = tmp_path / "inspections.db"
     monkeypatch.setattr(inspecoes, "get_settings", lambda: SimpleNamespace(db_path=db_path))
-    uploads = [make_upload("primeira.jpg"), make_upload("segunda.png", "PNG")]
+    uploads = [make_upload("primeira.jpg"), make_upload("segunda.png", "PNG", "blue")]
     capture = make_upload("camera.jpg")
     mock_uploads(monkeypatch, uploads)
     mock_capture(monkeypatch, capture)
@@ -163,6 +170,11 @@ def test_modular_persists_all_photos_and_report(tmp_path, monkeypatch, source):
     selected = uploads if source == FILE_SOURCE else [capture]
     assert len(app.session_state["inspecao_photos"]) == len(selected)
     if source == CAMERA_SOURCE:
+        second_capture = make_upload(color="green")
+        mock_capture(monkeypatch, second_capture)
+        app.run()
+        click(app, "Adicionar evidências à inspeção")
+        selected.append(second_capture)
         mock_uploads(monkeypatch, [])
     click(app, "Salvar inspeção")
     with sqlite3.connect(db_path) as connection:
@@ -170,7 +182,29 @@ def test_modular_persists_all_photos_and_report(tmp_path, monkeypatch, source):
     assert payload["fotos"] == [prepare_photo(photo).name for photo in selected]
     assert [Path(path).read_bytes() for path in payload["foto_paths"]] == [prepare_photo(photo).content for photo in selected]
     document = Document(BytesIO(app.session_state["inspecao_laudo"]))
-    assert len(document.inline_shapes) == len(selected)
+    expected = [prepare_photo(photo).content for photo in selected]
+    assert embedded_photos(document) == expected
+    saved = inspecoes.SQLiteRepository(db_path).list_measurements("inspecao")[0]
+    assert saved["foto_paths"] == payload["foto_paths"]
+    regenerated = inspecoes.RelatorioService().gerar_relatorio_inspecao(saved["status"], saved["foto_paths"])
+    assert embedded_photos(Document(BytesIO(regenerated))) == expected
+    assert app.session_state["inspecao_photos"] == []
+
+    next_photos = [make_upload("camera.jpg", color="yellow"), make_upload("camera.jpg", color="blue")]
+    app.radio(key="inspecao_source").set_value(FILE_SOURCE).run()
+    revision = app.session_state["inspecao_upload_revision"]
+    mock_uploads(monkeypatch, next_photos, revision=revision)
+    app.run()
+    click(app, "Adicionar evidências à inspeção")
+    click(app, "Salvar inspeção")
+    records = inspecoes.SQLiteRepository(db_path).list_measurements("inspecao")
+    assert len(records) == 2
+    assert records[1]["foto_paths"] == saved["foto_paths"]
+    assert len(set(records[0]["foto_paths"] + records[1]["foto_paths"])) == 4
+    assert embedded_photos(Document(BytesIO(app.session_state["inspecao_laudo"]))) == [
+        prepare_photo(photo).content for photo in next_photos
+    ]
+    assert [Path(path).read_bytes() for path in saved["foto_paths"]] == expected
     assert app.session_state["inspecao_photos"] == []
 
 
@@ -270,6 +304,69 @@ def test_legacy_form_preview_save_and_word(tmp_path, monkeypatch, source):
     assert len(rows) == 2
     assert pd.isna(rows.iloc[1]["Foto_Path"])
     assert json.loads(rows.iloc[1]["Foto_Paths"]) == []
+    assert app.selectbox(key="select_id_insp_banco").value == "INS-002"
+    assert embedded_photos(documents[-1]) == []
+
+    # Nomes e conteúdos repetidos não podem sobrescrever nem eliminar anexos.
+    if source == FILE_SOURCE:
+        app.radio(key="foto_insp_source").set_value(FILE_SOURCE).run()
+    selected = [
+        make_upload("foto.jpg", color="yellow"),
+        make_upload("foto.jpg", color="blue"),
+        make_upload("foto.jpg", color="yellow"),
+    ]
+    revision = app.session_state["foto_insp_upload_revision"]
+    mock_uploads(monkeypatch, selected, revision=revision)
+    app.run()
+    click(app, "Adicionar evidências à inspeção")
+    click(app, "Salvar Inspeção e Gerar Laudo Técnico")
+    rows = pd.read_excel(tmp_path / "Log_Inspecoes_Semanais.xlsx")
+    paths = json.loads(rows.iloc[2]["Foto_Paths"])
+    expected = [prepare_photo(photo).content for photo in selected]
+    assert len(set(paths + json.loads(rows.iloc[0]["Foto_Paths"]))) == 5
+    assert [(tmp_path / path).read_bytes() for path in paths] == expected
+    assert rows.iloc[2]["Foto_Path"] == paths[0]
+    assert app.selectbox(key="select_id_insp_banco").value == "INS-003"
+    assert embedded_photos(documents[-1]) == expected
+    assert [p.text for p in documents[-1].paragraphs if p.text.startswith("Evidência ")] == [
+        "Evidência 1 de 3", "Evidência 2 de 3", "Evidência 3 de 3",
+    ]
+    assert any("INS-003" in button.proto.label for button in app.get("download_button"))
+    app.run()
+    assert embedded_photos(documents[-1]) == expected
+
+    # Um arquivo ausente ou inválido não pode resultar em download parcial.
+    unavailable = tmp_path / paths[1]
+    content = unavailable.read_bytes()
+    for replacement in (None, b"not an image"):
+        if replacement is None:
+            unavailable.unlink()
+        else:
+            unavailable.write_bytes(replacement)
+        app.run()
+        assert not app.exception
+        assert any("evidências 2 de 3" in error.value for error in app.error)
+        assert not app.get("download_button")
+        persisted = pd.read_excel(tmp_path / "Log_Inspecoes_Semanais.xlsx")
+        assert json.loads(persisted.iloc[2]["Foto_Paths"]) == paths
+    unavailable.write_bytes(content)
+    app.run()
+    assert not app.error
+    assert app.get("download_button")
+    assert embedded_photos(documents[-1]) == expected
+
+    # O histórico continua navegável e registros de foto única são preservados.
+    app.selectbox(key="select_id_insp_banco").set_value("INS-001").run()
+    assert not app.exception
+    first_paths = json.loads(rows.iloc[0]["Foto_Paths"])
+    assert embedded_photos(documents[-1]) == [(tmp_path / path).read_bytes() for path in first_paths]
+    app.run()
+    assert app.selectbox(key="select_id_insp_banco").value == "INS-001"
+    rows.loc[0, "Foto_Paths"] = float("nan")
+    rows.to_excel(tmp_path / "Log_Inspecoes_Semanais.xlsx", index=False)
+    app.run()
+    assert not app.exception
+    assert embedded_photos(documents[-1]) == [(tmp_path / first_paths[0]).read_bytes()]
 
 
 def test_gallery_accumulates_mixed_sources_removes_and_clears(monkeypatch):

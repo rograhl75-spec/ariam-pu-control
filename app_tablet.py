@@ -826,7 +826,7 @@ else:
 
             df_db_insp = pd.concat([df_db_insp, pd.DataFrame([novo_reg_insp])], ignore_index=True)
             df_db_insp.to_excel(arq_db_insp, index=False)
-            st.session_state["ultimo_insp_id"] = proximo_id_insp
+            st.session_state["select_id_insp_banco"] = proximo_id_insp
             st.session_state["inspecao_salva"] = proximo_id_insp
             reset_photo_evidence("foto_insp")
             st.rerun()
@@ -919,12 +919,15 @@ else:
                 doc_i.add_paragraph(f"Descrição das Evidências: {limpar_valor(reg_i['Evidências Desc'])}")
                 
                 # Inserir todas as fotos, incluindo registros antigos com caminho único.
-                for foto_path_reg in photo_paths(reg_i):
+                caminhos_fotos = photo_paths(reg_i)
+                falhas_fotos = []
+                for indice, foto_path_reg in enumerate(caminhos_fotos, 1):
                     try:
+                        doc_i.add_paragraph(f"Evidência {indice} de {len(caminhos_fotos)}")
                         doc_i.add_picture(foto_path_reg, width=Inches(5.0))
                         doc_i.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
-                    except Exception as ex:
-                        doc_i.add_paragraph(f"[Aviso: Não foi possível anexar a imagem gráfica: {ex}]")
+                    except Exception:
+                        falhas_fotos.append(str(indice))
                 
                 doc_i.add_paragraph()
                 h4 = doc_i.add_heading("4. Conclusão e Recomendações Técnicas", level=2)
@@ -937,13 +940,21 @@ else:
                 doc_i.save(bio_i)
                 bio_i.seek(0)
                 
-                st.download_button(
-                    label=f"📥 Baixar Laudo da Inspeção {reg_i['ID']} em Word (.docx)",
-                    data=bio_i.getvalue(),
-                    file_name=f"Laudo_Inspecao_{reg_i['ID']}.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    key=f"btn_dl_insp_{reg_i['ID']}"
-                )
+                if falhas_fotos:
+                    st.error(
+                        f"Laudo da inspeção {reg_i['ID']} não disponibilizado: não foi possível "
+                        f"carregar as evidências {', '.join(falhas_fotos)} de {len(caminhos_fotos)}. "
+                        "Restaure os arquivos na pasta de fotos e tente novamente. "
+                        "A coleção salva no histórico foi preservada."
+                    )
+                else:
+                    st.download_button(
+                        label=f"📥 Baixar Laudo da Inspeção {reg_i['ID']} em Word (.docx)",
+                        data=bio_i.getvalue(),
+                        file_name=f"Laudo_Inspecao_{reg_i['ID']}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        key=f"btn_dl_insp_{reg_i['ID']}"
+                    )
 
     elif st.session_state["menu_ativo"] == "anomalias":
         st.subheader("⚠️ Registro de Anomalias & Abertura de Ocorrência")
