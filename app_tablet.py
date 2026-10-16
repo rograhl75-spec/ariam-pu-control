@@ -7,6 +7,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import io
+from ui.photo_evidence import render_photo_evidence
 
 try:
     from docx import Document
@@ -783,13 +784,15 @@ else:
 
             st.markdown("---")
             st.markdown("### 4️⃣ Anexo de Evidência Fotográfica & Conclusão")
-            foto_enviada = st.file_uploader("📸 Enviar Foto do Local / Equipamento", type=["jpg", "jpeg", "png"], key="foto_insp_up")
+            fotos = render_photo_evidence("foto_insp")
+            st.caption("Após escolher a origem e a foto, confira a prévia antes de salvar.")
+            st.form_submit_button("Conferir prévia da foto")
             insp_fotos_desc = st.text_area("Registro Descritivo das Evidências Visuais:", placeholder="Descreva os pontos inspecionados visualmente...")
             insp_conclusao = st.text_area("Conclusão Executiva & Recomendações Técnicas:", placeholder="Diretrizes gerais para a gestão desta máquina...")
 
             btn_gerar_relatorio = st.form_submit_button("Salvar Inspeção e Gerar Laudo Técnico")
 
-        if btn_gerar_relatorio:
+        if btn_gerar_relatorio and fotos is not None:
             arq_db_insp = "Log_Inspecoes_Semanais.xlsx"
             try:
                 df_db_insp = pd.read_excel(arq_db_insp)
@@ -798,13 +801,13 @@ else:
                 df_db_insp = pd.DataFrame()
                 proximo_id_insp = "INS-001"
 
-            # Salvar a imagem enviada em disco com o ID correspondente se houver upload
+            # Salvar a imagem selecionada em PNG com o ID correspondente.
             caminho_foto_salva = ""
-            if foto_enviada is not None:
+            if fotos:
                 os.makedirs("fotos_inspecoes", exist_ok=True)
                 caminho_foto_salva = f"fotos_inspecoes/{proximo_id_insp}.png"
                 with open(caminho_foto_salva, "wb") as f:
-                    f.write(foto_enviada.getbuffer())
+                    f.write(fotos[0].content)
 
             novo_reg_insp = {
                 "ID": proximo_id_insp,
