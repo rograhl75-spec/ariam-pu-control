@@ -1,4 +1,5 @@
 from io import BytesIO
+import base64
 from pathlib import Path
 from shutil import copyfile
 import json
@@ -15,7 +16,7 @@ from streamlit.testing.v1 import AppTest
 from streamlit.proto.Common_pb2 import FileURLs
 from streamlit.runtime.uploaded_file_manager import UploadedFile, UploadedFileRec
 
-from ui import photo_evidence
+from ui import photo_evidence, rear_camera
 from ui.photo_evidence import CAMERA_SOURCE, FILE_SOURCE, prepare_photo, select_photos
 
 
@@ -30,6 +31,14 @@ def make_upload(name="camera.jpg", fmt="JPEG", color="red"):
         UploadedFileRec(file_id=name, name=name, type=Image.MIME[fmt], data=content),
         FileURLs(),
     )
+
+
+def mock_capture(monkeypatch, capture):
+    monkeypatch.setattr(rear_camera, "_component", lambda **kwargs: {
+        "session": kwargs["session"],
+        "status": "photo" if capture else "empty",
+        "data": "data:image/jpeg;base64," + base64.b64encode(capture.getvalue()).decode() if capture else None,
+    })
 
 
 @pytest.mark.parametrize("fmt, name", [("JPEG", "camera.jpg"), ("PNG", "arquivo.png"), ("WEBP", "foto.webp")])
@@ -91,24 +100,27 @@ def test_render_invalid_active_photo_blocks_save(monkeypatch):
     ui = Mock()
     ui.radio.return_value = CAMERA_SOURCE
     ui.file_uploader.return_value = make_upload()
-    ui.camera_input.return_value = SimpleNamespace(name="camera.jpg", getvalue=lambda: b"invalid")
+    monkeypatch.setattr(photo_evidence, "render_rear_camera", lambda *a, **k: (
+        SimpleNamespace(name="camera.jpg", getvalue=lambda: b"invalid")
+    ))
     monkeypatch.setattr(photo_evidence, "st", ui)
     assert photo_evidence.render_photo_evidence("test") is None
     ui.error.assert_called_once()
 
 
-def test_native_camera_and_uploader_render_inside_form():
+def test_camera_component_and_uploader_render():
     app = AppTest.from_string(
-        "import streamlit as st\n"
         "from ui.photo_evidence import render_photo_evidence\n"
-        "with st.form('inspection'):\n"
-        "    render_photo_evidence('photo')\n"
-        "    st.form_submit_button('Salvar')\n"
+        "render_photo_evidence('photo')\n"
     ).run()
     assert not app.exception
-    assert len(app.get("camera_input")) == 1
+    assert len(app.get("component_instance")) == 1
     assert len(app.get("file_uploader")) == 1
     assert CAMERA_SOURCE in app.radio[0].options
+    assert not app.get("file_uploader")[0].proto.disabled
+    app.radio[0].set_value(CAMERA_SOURCE).run()
+    assert not app.exception
+    assert app.get("file_uploader")[0].proto.disabled
 
 
 @pytest.mark.parametrize("source", [FILE_SOURCE, CAMERA_SOURCE])
@@ -121,7 +133,7 @@ def test_modular_saves_only_active_source_names(tmp_path, monkeypatch, source):
     uploads = [make_upload("primeira.jpg"), make_upload("segunda.png", "PNG")]
     capture = make_upload("camera.jpg")
     monkeypatch.setattr(st, "file_uploader", lambda *a, **k: uploads)
-    monkeypatch.setattr(st, "camera_input", lambda *a, **k: capture)
+    mock_capture(monkeypatch, capture)
     app = AppTest.from_string("from src.pages.inspecoes import render\nrender()").run()
     app.radio(key="inspecao_source").set_value(source).run()
     next(button for button in app.button if button.label == "Salvar inspeção").click().run()
@@ -147,7 +159,7 @@ def test_legacy_form_preview_save_and_word(tmp_path, monkeypatch, source):
     upload = make_upload("arquivo.png", "PNG", "blue")
     capture = make_upload()
     monkeypatch.setattr(st, "file_uploader", lambda *a, **k: upload)
-    monkeypatch.setattr(st, "camera_input", lambda *a, **k: capture)
+    mock_capture(monkeypatch, capture)
     documents = []
 
     def document_factory():
@@ -161,8 +173,10 @@ def test_legacy_form_preview_save_and_word(tmp_path, monkeypatch, source):
     app.session_state["menu_ativo"] = "inspecoes"
     app.run()
     assert not app.exception
-    app.radio(key="foto_insp_source").set_value(source)
     next(field for field in app.text_area if field.label == "Observações de Manutenção:").set_value("Mantido na prévia")
+    app.run()
+    app.radio(key="foto_insp_source").set_value(source).run()
+    assert next(field for field in app.text_area if field.label == "Observações de Manutenção:").value == "Mantido na prévia"
     next(button for button in app.button if button.label == "Conferir prévia da foto").click().run()
     assert not app.exception
     assert not (tmp_path / "Log_Inspecoes_Semanais.xlsx").exists()
@@ -185,7 +199,7 @@ def test_legacy_form_preview_save_and_word(tmp_path, monkeypatch, source):
         monkeypatch.setattr(st, "file_uploader", lambda *a, **k: None)
         app.radio(key="foto_insp_source").set_value(FILE_SOURCE)
     else:
-        monkeypatch.setattr(st, "camera_input", lambda *a, **k: None)
+        mock_capture(monkeypatch, None)
         app.radio(key="foto_insp_source").set_value(CAMERA_SOURCE)
     next(button for button in app.button if button.label == "Salvar Inspeção e Gerar Laudo Técnico").click().run()
     assert not app.exception

@@ -8,10 +8,11 @@ from PIL import Image, ImageOps
 import streamlit as st
 
 from src.validators import validate_image_upload
+from ui.rear_camera import render_rear_camera
 
 
 FILE_SOURCE = "Enviar arquivo"
-CAMERA_SOURCE = "Tirar foto / Usar câmera"
+CAMERA_SOURCE = "Tirar foto com câmera traseira"
 
 
 @dataclass
@@ -60,21 +61,22 @@ def render_photo_evidence(key: str, multiple: bool = False) -> list[Photo] | Non
         type=["jpg", "jpeg", "png", "webp"] if multiple else ["jpg", "jpeg", "png"],
         accept_multiple_files=multiple,
         key=f"{key}_upload",
+        disabled=source != FILE_SOURCE,
     )
     st.info(
-        "Para tirar foto, selecione 'Tirar foto / Usar câmera' e permita o acesso "
+        "Para tirar foto, selecione 'Tirar foto com câmera traseira' e permita o acesso "
         "à câmera no navegador. É necessário HTTPS ou localhost no próprio dispositivo. "
         "Se a câmera não aparecer, estiver ocupada ou a permissão for negada, "
         "verifique as permissões do site e do sistema, feche outros aplicativos de câmera "
         "ou selecione 'Enviar arquivo'. Em HTTP por IP da rede, use o envio de arquivo."
     )
-    capture = st.camera_input("📸 Tirar foto do Local / Equipamento", key=f"{key}_camera")
-    files = uploads if multiple else ([uploads] if uploads is not None else [])
-    selected = select_photos(source, files, capture)
     st.caption(f"Origem ativa: {source}. Somente as imagens desta origem serão anexadas.")
-    if not selected:
-        st.caption("Nenhuma foto selecionada na origem ativa. A inspeção será salva sem foto.")
     try:
+        capture = render_rear_camera(key, active=source == CAMERA_SOURCE)
+        files = uploads if multiple else ([uploads] if uploads is not None else [])
+        selected = select_photos(source, files, capture)
+        if not selected:
+            st.caption("Nenhuma foto selecionada na origem ativa. A inspeção será salva sem foto.")
         photos = [prepare_photo(photo) for photo in selected]
     except ValueError as exc:
         st.error(f"Foto inválida: {exc}. Remova ou substitua a imagem da origem ativa.")
