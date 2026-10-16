@@ -48,29 +48,51 @@ streamlit run app.py
 pytest -q
 ```
 
-## Evidências fotográficas: câmera ou arquivo
+## Evidências fotográficas: múltiplas fotos por inspeção
 
 Nas inspeções, escolha **Origem da evidência fotográfica**:
-**Enviar arquivo** (JPG/JPEG/PNG; também WebP no app modular) ou
-**Tirar foto com câmera traseira**. Somente a origem selecionada é anexada;
-o upload fica desabilitado enquanto a câmera é a origem ativa, mas seus arquivos
-são mantidos ao alternar. Ao sair da origem câmera, a captura é descartada:
-ao voltar, tire uma nova foto. Uma nova tentativa de captura ou troca de câmera
-também descarta a captura anterior, mesmo se a tentativa falhar.
+**Enviar arquivo** (JPG/JPEG/PNG/WebP, com seleção múltipla) ou
+**Tirar foto com câmera traseira**. É possível misturar as duas origens
+na mesma inspeção:
+
+1. Capture uma foto ou selecione um ou vários arquivos.
+2. Toque em **Adicionar evidências à inspeção** para manter as imagens na sessão.
+3. Confira as miniaturas na galeria. Use **Remover foto N** para excluir
+   individualmente ou **Limpar evidências** para esvaziar a coleção e as entradas.
+4. Capture e adicione outras fotos, ou alterne para upload. As fotos **já
+   adicionadas** não são substituídas nem descartadas ao trocar de origem,
+   cancelar a câmera ou repetir a captura.
+5. Somente depois de revisar todas as evidências, salve a inspeção/ gere o laudo.
+
+Uma captura ainda **pendente**, não adicionada, é substituída pela próxima
+tentativa e descartada ao sair da origem câmera. Adicione-a antes de continuar.
+Arquivos pendentes permanecem selecionados ao alternar a origem, mas somente
+a seleção ativa é adicionada. Uma seleção ativa pendente impede o salvamento
+até ser adicionada ou descartada, evitando omissões silenciosas.
+Após salvar com sucesso, a coleção é limpa para não reutilizar fotos na próxima
+inspeção. A coleção não salva vive apenas na sessão: salve antes de fechar ou
+recarregar o navegador.
 
 Na tela legada (`streamlit run app_tablet.py`), a seção
-**4 Anexo de Evidência Fotográfica & Conclusão** inclui o botão
-**Conferir prévia da foto** (sem salvar a inspeção). Os campos desta seção
-são reativos, sem formulário em lote, para preservar as descrições e permitir
-troca imediata da origem. A prévia aparece automaticamente após a captura.
-Depois clique em **Salvar Inspeção e Gerar Laudo Técnico**.
-Fotos de câmera e arquivo passam pela mesma validação (até 5 MiB por foto),
-correção de orientação e conversão para PNG. São salvas em `fotos_inspecoes/`,
-referenciadas em `Log_Inspecoes_Semanais.xlsx` e incorporadas ao laudo Word.
-Mantenha a pasta de fotos junto à planilha para gerar laudos posteriormente.
-No app modular (`app.py`), preserva-se o fluxo existente: vários arquivos ou
-uma captura, prévia imediata e registro dos nomes no SQLite; esse fluxo
-**não armazena os bytes nem gera laudo fotográfico**.
+**4 Anexo de Evidência Fotográfica & Conclusão** mantém as descrições durante
+as adições e remoções. Ao terminar, clique em
+**Salvar Inspeção e Gerar Laudo Técnico**. Todas as imagens são salvas com nomes
+únicos em `fotos_inspecoes/`, referenciadas na coluna JSON `Foto_Paths` de
+`Log_Inspecoes_Semanais.xlsx` e incorporadas ao Word, na ordem da galeria.
+`Foto_Path` continua contendo a primeira foto por compatibilidade; registros
+antigos com apenas essa coluna continuam gerando laudo.
+Mantenha a pasta de fotos junto à planilha para regenerar laudos posteriormente.
+No app modular (`app.py`), **Salvar inspeção** grava os nomes e os caminhos
+no SQLite, os bytes em `fotos_inspecoes/` junto ao banco, e disponibiliza
+**Baixar laudo da última inspeção**, com todas as imagens.
+
+O limite é de **20 fotos por inspeção** e **5 MiB por imagem**, tanto no arquivo
+de entrada quanto no PNG normalizado. Câmera e upload passam pela mesma
+validação, correção de orientação e conversão. Se um lote contiver uma imagem
+inválida ou exceder a quantidade, nenhuma imagem desse lote será adicionada;
+as evidências anteriores permanecem intactas. Remova fotos ou reduza o lote
+antes de adicionar novas. Ao atingir 20 fotos, a câmera fica desativada até
+remover uma evidência.
 
 ### Acesso à câmera e roteiro manual (Android/desktop)
 
@@ -107,16 +129,18 @@ de abrir após cancelamento também tem seu stream encerrado.
    Aponte para um equipamento e confirme que a imagem é da câmera traseira,
    não uma selfie. Se houver seletor, troque entre frontal/traseira e confira
    a imagem e o desligamento da câmera anterior. Teste tablet em retrato e paisagem.
-2. Capture uma foto, confira a imagem e, no legado, clique em **Conferir prévia
-   da foto**. Verifique que os demais campos preenchidos continuam intactos.
-3. Salve a inspeção, selecione seu ID no histórico e baixe o laudo Word.
-   Confira se a foto está correta e orientada.
-4. Troque para **Enviar arquivo**, selecione um JPG/PNG diferente, confira a
-   prévia e salve. Verifique que o laudo usa o arquivo, não a captura anterior.
-5. Volte para a origem câmera: confirme que a captura antiga foi removida e
-   não é salva silenciosamente. Capture novamente, remova a foto e teste
-   cancelar/reabrir. Alterne a aba/aplicativo e confirme que a câmera desliga.
-   Confira que descrições e arquivo previamente escolhido permanecem ao alternar.
+2. Capture e clique em **Adicionar evidências à inspeção**. Repita com pelo
+   menos três fotos. Confira todas as miniaturas e as descrições preenchidas.
+3. Troque para **Enviar arquivo**, selecione dois arquivos diferentes e
+   adicione-os. Remova uma foto individual e confira que as demais permanecem.
+   Volte à câmera e adicione outra foto; teste cancelar/reabrir sem perder a galeria.
+4. Salve a inspeção, selecione seu ID no histórico e baixe o laudo Word.
+   Confira a quantidade, ordem e orientação de todas as imagens. No modular,
+   use **Baixar laudo da última inspeção**. Confirme que a próxima inspeção
+   começa sem as fotos já salvas.
+5. Em uma nova inspeção, teste **Limpar evidências**, re-renderizações e o limite
+   de 20 fotos. Remova uma foto para liberar a câmera. Teste arquivo acima de
+   5 MiB e lote inválido. Alterne a aba/aplicativo e confirme que a câmera desliga.
 6. Negue a permissão da câmera: confira a orientação na tela e use **Enviar
    arquivo**. Para tentar novamente, libere a câmera nas permissões do site e
    do Android, feche aplicativos que a estejam usando e recarregue a página.

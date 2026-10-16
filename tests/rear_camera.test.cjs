@@ -107,6 +107,24 @@ test("device change stops previous stream and requests selected device, without 
   assert.equal(app.tracks[1].stopped, 1);
 });
 
+test("adding a capture resets only the pending preview and allows another rear-camera photo", async () => {
+  const app = setup();
+  app.click("start");
+  await settle();
+  app.click("capture");
+  assert.equal(app.values().at(-1).value.session, 1);
+  app.render(true, 2);
+  assert.equal(app.nodes.get("preview").hidden, true);
+  assert.equal(app.calls.length, 1, "reset must not reopen camera automatically");
+  app.click("start");
+  await settle();
+  app.click("capture");
+  assert.equal(app.values().at(-1).value.session, 2);
+  assert.equal(app.values().at(-1).value.status, "photo");
+  assert.equal(app.calls[1].video.facingMode.ideal, "environment");
+  assert.ok(app.tracks.every(track => track.stopped === 1));
+});
+
 test("source switch closes stream, clears preview and ignores late permission result", async () => {
   let resolve;
   const app = setup({getUserMedia: () => new Promise(done => { resolve = done; })});

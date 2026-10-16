@@ -18,6 +18,7 @@ data/*.db
 *.db
 *.sqlite
 *.sqlite3
+fotos_inspecoes/
 Log_*.xlsx
 Relatorio_Processo_Injecao_Atualizado.xlsx
 

@@ -7,7 +7,9 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import io
-from ui.photo_evidence import render_photo_evidence
+import json
+from pathlib import Path
+from ui.photo_evidence import photo_paths, render_photo_evidence, reset_photo_evidence, save_photos
 
 try:
     from docx import Document
@@ -785,8 +787,7 @@ else:
             st.markdown("---")
             st.markdown("### 4️⃣ Anexo de Evidência Fotográfica & Conclusão")
             fotos = render_photo_evidence("foto_insp")
-            st.caption("Após escolher a origem e a foto, confira a prévia antes de salvar.")
-            st.button("Conferir prévia da foto")
+            st.caption("Adicione todas as fotos, revise as evidências e só então salve a inspeção.")
             insp_fotos_desc = st.text_area("Registro Descritivo das Evidências Visuais:", placeholder="Descreva os pontos inspecionados visualmente...")
             insp_conclusao = st.text_area("Conclusão Executiva & Recomendações Técnicas:", placeholder="Diretrizes gerais para a gestão desta máquina...")
 
@@ -801,13 +802,7 @@ else:
                 df_db_insp = pd.DataFrame()
                 proximo_id_insp = "INS-001"
 
-            # Salvar a imagem selecionada em PNG com o ID correspondente.
-            caminho_foto_salva = ""
-            if fotos:
-                os.makedirs("fotos_inspecoes", exist_ok=True)
-                caminho_foto_salva = f"fotos_inspecoes/{proximo_id_insp}.png"
-                with open(caminho_foto_salva, "wb") as f:
-                    f.write(fotos[0].content)
+            caminhos_fotos = save_photos(fotos, Path("fotos_inspecoes"))
 
             novo_reg_insp = {
                 "ID": proximo_id_insp,
@@ -824,14 +819,20 @@ else:
                 "Segurança Status": insp_seg_status,
                 "Segurança Obs": limpar_valor(insp_seg_obs),
                 "Evidências Desc": limpar_valor(insp_fotos_desc),
-                "Foto_Path": caminho_foto_salva,
+                "Foto_Path": caminhos_fotos[0] if caminhos_fotos else "",
+                "Foto_Paths": json.dumps(caminhos_fotos),
                 "Conclusão": limpar_valor(insp_conclusao)
             }
 
             df_db_insp = pd.concat([df_db_insp, pd.DataFrame([novo_reg_insp])], ignore_index=True)
             df_db_insp.to_excel(arq_db_insp, index=False)
-            st.success(f"Inspeção **{proximo_id_insp}** salva com sucesso no banco de dados!")
             st.session_state["ultimo_insp_id"] = proximo_id_insp
+            st.session_state["inspecao_salva"] = proximo_id_insp
+            reset_photo_evidence("foto_insp")
+            st.rerun()
+
+        if "inspecao_salva" in st.session_state:
+            st.success(f"Inspeção **{st.session_state.pop('inspecao_salva')}** salva com sucesso no banco de dados!")
 
         if os.path.exists("Log_Inspecoes_Semanais.xlsx"):
             st.markdown("---")
@@ -917,9 +918,8 @@ else:
                 h3.runs[0].font.color.rgb = RGBColor(31, 78, 120)
                 doc_i.add_paragraph(f"Descrição das Evidências: {limpar_valor(reg_i['Evidências Desc'])}")
                 
-                # INSERIR A FOTO NO RELATÓRIO WORD SE ELA EXISTIR
-                foto_path_reg = str(reg_i.get('Foto_Path', ''))
-                if foto_path_reg and os.path.exists(foto_path_reg):
+                # Inserir todas as fotos, incluindo registros antigos com caminho único.
+                for foto_path_reg in photo_paths(reg_i):
                     try:
                         doc_i.add_picture(foto_path_reg, width=Inches(5.0))
                         doc_i.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
