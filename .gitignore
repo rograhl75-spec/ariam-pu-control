@@ -35,3 +35,12 @@ dist/
 # Temporary files
 /tmp/
 *.tmp
+
+# Dados de processo e planilhas controladas: nunca versionar (repositório público)
+*.xlsx
+*.xls
+*.xlsm
+*.csv
+!tests/**/*.xlsx
+fotos_inspecoes/
+laudos/

@@ -1,7 +1,6 @@
 from io import BytesIO
 import base64
 from pathlib import Path
-from shutil import copyfile
 import json
 import sqlite3
 from types import SimpleNamespace
@@ -13,6 +12,8 @@ from PIL import Image
 import pandas as pd
 import pytest
 from streamlit.testing.v1 import AppTest
+
+from tests.planilha_teste import criar_planilha_teste
 from streamlit.proto.Common_pb2 import FileURLs
 from streamlit.runtime.uploaded_file_manager import UploadedFile, UploadedFileRec
 
@@ -231,8 +232,7 @@ def test_legacy_form_preview_save_and_word(tmp_path, monkeypatch, source):
     import requests
 
     monkeypatch.chdir(tmp_path)
-    base = "Relatorio_Processo_Injecao_Atualizado.xlsx"
-    copyfile(ROOT / base, tmp_path / base)
+    criar_planilha_teste(tmp_path)
     monkeypatch.setattr(requests, "get", lambda *a, **k: SimpleNamespace(
         json=lambda: {"current_weather": {"temperature": 24}}
     ))
@@ -351,7 +351,7 @@ def test_legacy_form_preview_save_and_word(tmp_path, monkeypatch, source):
         assert json.loads(persisted.iloc[2]["Foto_Paths"]) == paths
     unavailable.write_bytes(content)
     app.run()
-    assert not app.error
+    assert not app.error, [e.value for e in app.error]
     assert app.get("download_button")
     assert embedded_photos(documents[-1]) == expected
 
