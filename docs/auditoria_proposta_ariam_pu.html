@@ -119,8 +119,8 @@ a { color: var(--accent); }
     <p class="lead">O aplicativo atual não deve receber 10 usuários do jeito que está. Os dados de produção ficam em planilhas Excel e num SQLite local que somem quando o servidor reinicia, qualquer usuário logado pode alterar tudo, e os parâmetros técnicos que o app mostra divergem da revisão controlada Rev. 02 (12/11/2026). A recomendação é reconstruir sobre um banco PostgreSQL gerenciado, com perfis de acesso e a planilha Rev. 02 como cadastro mestre, mantendo Python/Streamlit para aproveitar os cálculos e laudos que já existem.</p>
     <div class="kv">
       <div><span class="k">Veredito do app atual</span><span class="v">Reconstruir a base</span><span class="s">4 falhas críticas, 8 altas</span></div>
-      <div><span class="k">Hospedagem recomendada</span><span class="v">Supabase + Render</span><span class="s">Postgres, login, fotos e backup diário</span></div>
-      <div><span class="k">Custo mensal estimado</span><span class="v">≈ US$ 32 (≈ R$ 165)</span><span class="s">variante gratuita possível, com riscos</span></div>
+      <div><span class="k">Hospedagem escolhida</span><span class="v">Supabase + Streamlit (grátis)</span><span class="s">com cópia noturna do banco no Drive</span></div>
+      <div><span class="k">Custo mensal</span><span class="v">US$ 0</span><span class="s">plano pago (≈ US$ 25) só se os limites atrapalharem</span></div>
       <div><span class="k">Prazo estimado</span><span class="v">8 a 11 semanas</span><span class="s">em 4 fases, lançamentos na fase 2</span></div>
     </div>
   </div>
@@ -399,7 +399,7 @@ erDiagram
       <tr><td>5. Ensaios de laboratório</td><td>Histórico de núcleo, compressão e fator K; densidade × compressão; massa injetada × resultado por modelo; pontos abaixo de 110 kPa</td><td>A cada ensaio + consolidado</td><td>PDF</td></tr>
       <tr><td>6. Boletim diário do turno</td><td>Tudo que foi lançado no dia, desvios e pendências; texto para WhatsApp e e-mail</td><td>Diário, automático</td><td>Texto + PDF</td></tr>
       <tr><td>7. Anomalias</td><td>Abertas, vencidas, tempo de fechamento, Pareto por origem e equipamento</td><td>Semanal</td><td>PDF</td></tr>
-      <tr><td>8. Consumo e custo de matéria-prima</td><td>Massas × produção → iso, poliol e agente; comparativo de regimes (ciclopentano, n-pentano, HFO)</td><td>Mensal (exige lançar produção por item)</td><td>Excel</td></tr>
+      <tr><td>8. Consumo e custo de matéria-prima</td><td>Massas × produção → iso, poliol e agente; comparativo de regimes (ciclopentano, n-pentano, HFO)</td><td>Fora da fase inicial</td><td>Excel</td></tr>
       <tr><td>9. Controle de revisões</td><td>O que mudou entre revisões: massas, faixas, parâmetros, com Δ%</td><td>A cada revisão</td><td>PDF</td></tr>
       <tr><td>10. Lotes de matéria-prima</td><td>Validade, viscosidade, ensaios vinculados ao lote</td><td>Sob demanda</td><td>PDF</td></tr>
       <tr><td>11. Relatório executivo mensal</td><td>Indicadores: % de lançamentos conformes por controle, anomalias, ensaios, custo; para a gerência ARIAM</td><td>Mensal</td><td>PDF</td></tr>
@@ -436,13 +436,16 @@ erDiagram
 </section>
 
 <section>
-  <h2>Decisões que dependem de você</h2>
+  <h2>Decisões registradas em 13/11/2026</h2>
   <ul class="clean">
-    <li><b>Hospedagem:</b> opção A paga (≈ US$ 32/mês) ou começar pela B gratuita, aceitando pausa e sem backup automático.</li>
+    <li><b>Hospedagem:</b> gratuita (Supabase Free + Streamlit Community Cloud). Cópia noturna automática do banco para o Drive; fotos comprimidas para caber em 1 GB; o primeiro acesso do dia pode levar até 1 minuto para o app acordar.</li>
+    <li><b>Massa frio/calor:</b> o app sugere a condição pela temperatura externa e mostra o motivo; a supervisão confirma ou troca, e a escolha fica registrada.</li>
+    <li><b>Escopo inicial:</b> só controle de processo. Consumo e custo de matéria-prima ficam para depois.</li>
+  </ul>
+  <h2>Decisões pendentes</h2>
+  <ul class="clean">
     <li><b>Faixas de especificação:</b> densidade livre do Cab. 1 (24–26 está sendo excedida em todo ensaio), pega livre (55–75 s), estufas (sem faixa) e tolerância de massa medida × injetada.</li>
-    <li><b>Massa frio/calor:</b> confirmar que a escolha fica com a supervisão e remover a troca automática pelo clima.</li>
     <li><b>Correções:</b> operador pode corrigir o próprio lançamento por algumas horas, ou toda correção passa por você.</li>
-    <li><b>Produção por item:</b> se alguém vai lançar quantidades produzidas, o que habilita o relatório de consumo e custo.</li>
     <li><b>Ensaios antigos:</b> localizar os 12 relatórios Dow que não estão na pasta.</li>
   </ul>
 </section>
