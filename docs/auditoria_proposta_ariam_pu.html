@@ -1,0 +1,454 @@
+<title>ARIAM PU Control — Auditoria e Proposta</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: relatório técnico em coluna única, numeração só onde há sequência real; tabelas roláveis; severidade codificada em faixa lateral */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --ink: #17212b;
+  --muted: #56636f;
+  --line: #d9dee4;
+  --accent: #1f4e78;
+  --accent-soft: #e5edf5;
+  --crit: #b42318; --crit-soft: #fdecea;
+  --warn: #a15c07; --warn-soft: #fdf3e2;
+  --ok: #1d7a46; --ok-soft: #e6f4ec;
+  --info: #3b5b85; --info-soft: #eaf0f7;
+  --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", Roboto, Arial, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161c; --surface: #18202a; --ink: #e4e9ee; --muted: #9aa7b3; --line: #2b3643;
+    --accent: #7fb0e0; --accent-soft: #1d2c3d;
+    --crit: #f2877d; --crit-soft: #3a1d1b; --warn: #f0b45c; --warn-soft: #362812;
+    --ok: #6fcf97; --ok-soft: #15301f; --info: #9ab8e0; --info-soft: #1c2838;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161c; --surface: #18202a; --ink: #e4e9ee; --muted: #9aa7b3; --line: #2b3643;
+  --accent: #7fb0e0; --accent-soft: #1d2c3d;
+  --crit: #f2877d; --crit-soft: #3a1d1b; --warn: #f0b45c; --warn-soft: #362812;
+  --ok: #6fcf97; --ok-soft: #15301f; --info: #9ab8e0; --info-soft: #1c2838;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15.5px; line-height: 1.6; }
+.wrap { max-width: 1040px; margin: 0 auto; padding-block: 32px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 40px; }
+header.top { display: grid; gap: 10px; border-bottom: 2px solid var(--accent); padding-bottom: 22px; }
+.eyebrow { font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; line-height: 1.2; }
+h1 { font-size: clamp(1.7rem, 3.6vw, 2.5rem); font-weight: 800; color: var(--accent); }
+h2 { font-size: 1.45rem; font-weight: 700; }
+h3 { font-size: 1.08rem; font-weight: 700; }
+p { margin: 0; max-width: 72ch; }
+section { display: grid; gap: 16px; min-width: 0; }
+.lead { font-size: 1.06rem; color: var(--ink); }
+.muted { color: var(--muted); }
+.mono, td.num, .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 13.5px; color: var(--muted); }
+.meta b { color: var(--ink); font-weight: 600; }
+
+.verdict { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 22px; display: grid; gap: 14px; }
+.kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.kv > div { border-top: 3px solid var(--accent); padding-top: 8px; display: grid; gap: 2px; min-width: 0; }
+.kv .k { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.kv .v { font-family: var(--f-display); font-weight: 700; font-size: 1.12rem; }
+.kv .s { font-size: 13.5px; color: var(--muted); }
+
+ul.clean { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 78ch; }
+
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; background: var(--accent-soft); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.num { text-align: right; white-space: nowrap; }
+td.bad { color: var(--crit); font-weight: 600; }
+td.okc { color: var(--ok); }
+
+.findings { display: grid; gap: 10px; }
+.f { background: var(--surface); border: 1px solid var(--line); border-left: 5px solid var(--info); border-radius: 4px; padding: 14px 16px; display: grid; gap: 6px; min-width: 0; }
+.f.crit { border-left-color: var(--crit); }
+.f.high { border-left-color: var(--warn); }
+.f .hd { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.f .ev { font-size: 13px; color: var(--muted); font-family: var(--f-mono); overflow-wrap: anywhere; }
+.pill { font-family: var(--f-mono); font-size: 11.5px; padding: 1px 8px; border-radius: 99px; font-weight: 500; letter-spacing: .03em; white-space: nowrap; }
+.pill.crit { background: var(--crit-soft); color: var(--crit); }
+.pill.high { background: var(--warn-soft); color: var(--warn); }
+.pill.med { background: var(--info-soft); color: var(--info); }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+
+.note { background: var(--warn-soft); color: var(--ink); border-radius: 4px; padding: 10px 14px; font-size: 14px; max-width: 80ch; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.card.rec { border: 2px solid var(--accent); }
+.card ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14.5px; }
+
+ol.phases { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; counter-reset: ph; }
+ol.phases > li { counter-increment: ph; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px 14px 60px; position: relative; display: grid; gap: 6px; }
+ol.phases > li::before { content: counter(ph); position: absolute; left: 16px; top: 13px; width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: var(--surface); font-family: var(--f-display); font-weight: 700; display: grid; place-items: center; }
+ol.phases ul { margin: 0; padding-left: 18px; font-size: 14.5px; display: grid; gap: 3px; }
+
+pre.mermaid { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px; overflow-x: auto; }
+footer { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; display: grid; gap: 6px; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+
+<header class="top">
+  <div class="eyebrow">Isolamento espumado PU · ARIAM Londrina · Doc. 59001000100</div>
+  <h1>ARIAM PU Control: auditoria do aplicativo e proposta de remodelagem</h1>
+  <div class="meta">
+    <span>Data <b>13/11/2026</b></span>
+    <span>Base <b>repositório ariam-pu-control (commit dddecb6)</b></span>
+    <span>Drive <b>21 arquivos da pasta de relatórios</b></span>
+    <span>Campo <b>DOC 0001/15, pesagem, térmico via WhatsApp</b></span>
+  </div>
+</header>
+
+<section>
+  <h2>Resumo executivo</h2>
+  <div class="verdict">
+    <p class="lead">O aplicativo atual não deve receber 10 usuários do jeito que está. Os dados de produção ficam em planilhas Excel e num SQLite local que somem quando o servidor reinicia, qualquer usuário logado pode alterar tudo, e os parâmetros técnicos que o app mostra divergem da revisão controlada Rev. 02 (12/11/2026). A recomendação é reconstruir sobre um banco PostgreSQL gerenciado, com perfis de acesso e a planilha Rev. 02 como cadastro mestre, mantendo Python/Streamlit para aproveitar os cálculos e laudos que já existem.</p>
+    <div class="kv">
+      <div><span class="k">Veredito do app atual</span><span class="v">Reconstruir a base</span><span class="s">4 falhas críticas, 8 altas</span></div>
+      <div><span class="k">Hospedagem recomendada</span><span class="v">Supabase + Render</span><span class="s">Postgres, login, fotos e backup diário</span></div>
+      <div><span class="k">Custo mensal estimado</span><span class="v">≈ US$ 32 (≈ R$ 165)</span><span class="s">variante gratuita possível, com riscos</span></div>
+      <div><span class="k">Prazo estimado</span><span class="v">8 a 11 semanas</span><span class="s">em 4 fases, lançamentos na fase 2</span></div>
+    </div>
+  </div>
+  <p>Os dados de campo enviados (fotos de hoje) já mostram desvios que o app deveria apontar sozinho e não aponta: densidade livre do cabeçote 1 acima da faixa em todos os ensaios, tempo de pega acima de 75 s na maioria das leituras, peças pesando de 61 a 311 g a mais que a massa injetada informada pelo CLP e um ponto de molde abaixo de 40 °C hoje. Detalhes na seção <a href="#campo">Achados nos dados de processo</a>.</p>
+</section>
+
+<section>
+  <h2>O que foi analisado</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Fonte</th><th>Conteúdo</th><th>Uso na proposta</th></tr></thead>
+    <tbody>
+      <tr><td>Código <span class="mono">app_tablet.py</span> (1.247 linhas)</td><td>App legado, iniciado pelo <span class="mono">iniciar_app.bat</span>; grava em <span class="mono">Log_*.xlsx</span></td><td>É o app que roda hoje na fábrica. Regras e laudos a migrar</td></tr>
+      <tr><td>Código <span class="mono">app.py</span> + <span class="mono">src/</span></td><td>App modular com SQLite, serviços e testes</td><td>Estrutura aproveitável; telas genéricas a refazer</td></tr>
+      <tr><td><span class="mono">59001000100_Parametros_e_Massas_PU_Rev02_2026-11-12.xlsx</span></td><td>Capa, parâmetros por regime e cabeçote, 268 itens com massa nominal/frio/calor, resumo, histórico de revisões</td><td>Cadastro mestre do novo banco</td></tr>
+      <tr><td>Fichas de injeção Cab. 1 e Cab. 2 (PDF, Rev. 02)</td><td>Ficha de chão de fábrica gerada da planilha</td><td>Relatório que o app passa a emitir</td></tr>
+      <tr><td>5 relatórios Dow (ID 1539, 1652, 1686, ilhas 11 kg e 14 kg)</td><td>Densidade de núcleo, compressão a 10% e fator K por peça e posição A–E</td><td>Tabela de ensaios de laboratório</td></tr>
+      <tr><td>Curva de viscosidade CR 2610 (02/10/2026)</td><td>Lotes 001 e 009 a 25 e 40 °C</td><td>Controle de lote de matéria-prima</td></tr>
+      <tr><td>Estudo Ciclopentano → HFO-1233zd</td><td>Custos, consumo anual, histórico de 17 ensaios</td><td>Relatório de consumo e custo; módulo de teste HFO</td></tr>
+      <tr><td>TDS/FDS (CR 2610, CE 164, ciclopentano, n-pentano, Solstice LBA, HFO)</td><td>Fichas técnicas e de segurança</td><td>Biblioteca de documentos com link</td></tr>
+      <tr><td>Fotos: DOC 0001/15, caderno de pesagem, WhatsApp térmico</td><td>Registros manuscritos de 29/10 a 13/11/2026</td><td>Modelo dos formulários de lançamento</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>Auditoria do aplicativo atual</h2>
+  <p class="muted">Severidade: <span class="pill crit">crítico</span> perda de dados, segurança ou decisão técnica errada · <span class="pill high">alto</span> resultado incorreto ou retrabalho · <span class="pill med">médio</span> manutenção e qualidade.</p>
+  <div class="findings">
+
+    <div class="f crit"><div class="hd"><span class="pill crit">crítico</span><h3>Os dados de produção não têm onde ficar com segurança</h3></div>
+      <p>O app legado lê e reescreve a planilha inteira a cada lançamento (<span class="mono">pd.read_excel</span> → <span class="mono">concat</span> → <span class="mono">to_excel</span>). Com dois usuários salvando ao mesmo tempo, um apaga o registro do outro. Os IDs são <span class="mono">len(df)+1</span> e se repetem se uma linha for removida. Em hospedagem na nuvem (Streamlit Cloud, Render) o disco é temporário: Excel, SQLite e fotos somem a cada reinício ou novo deploy.</p>
+      <p class="ev">app_tablet.py:433-439, 505-511, 619-643, 797-828, 1009-1042 · src/storage/sqlite_repository.py</p></div>
+
+    <div class="f crit"><div class="hd"><span class="pill crit">crítico</span><h3>Não existe controle de permissão</h3></div>
+      <p>O perfil do usuário é lido no login e nunca mais consultado. Qualquer pessoa logada lança, edita e regrava o histórico de anomalias (tabela editável com botão de salvar). Não há registro de quem alterou o quê. O requisito "só o meu usuário altera" não é atendido.</p>
+      <p class="ev">app.py:72-84 (role guardado, nunca verificado) · app_tablet.py:1095-1099 (edição livre do histórico)</p></div>
+
+    <div class="f crit"><div class="hd"><span class="pill crit">crítico</span><h3>Senhas em texto puro no app que está em uso</h3></div>
+      <p>O app legado compara a senha digitada com <span class="mono">st.secrets["passwords"]</span> em texto puro. O hash PBKDF2 existe só no app modular, que não é o executado pelo <span class="mono">iniciar_app.bat</span>.</p>
+      <p class="ev">app_tablet.py:33-43 · iniciar_app.bat</p></div>
+
+    <div class="f crit"><div class="hd"><span class="pill crit">crítico</span><h3>Dados pessoais e de processo versionados no Git</h3></div>
+      <p><span class="mono">Log_Registro_Anomalias.xlsx</span> e os demais <span class="mono">Log_*.xlsx</span> estão no repositório desde 31/08/2026, com e-mails de terceiros (Fast Gôndolas). O <span class="mono">.gitignore</span> foi ajustado depois e não remove o que já foi enviado. Nomes e e-mails de 7 gestores também estão fixos no código. Se o repositório for ou ficar público, isso vaza. A correção exige remover do histórico do Git, não só apagar o arquivo.</p>
+      <p class="ev">git ls-files: 4 planilhas de log/processo rastreadas · app_tablet.py:964-971</p></div>
+
+    <div class="f high"><div class="hd"><span class="pill high">alto</span><h3>Parâmetros exibidos divergem da revisão controlada</h3></div>
+      <p>A tela de produção lê <span class="mono">Relatorio_Processo_Injecao_Atualizado.xlsx</span>, uma cópia derivada sem número de revisão. Ela traz pressão do Cab. 1 de <b>130 ± 10 bar</b> (Rev. 02: 140 ± 10), relação <b>1,34 ± 0,03</b> (Rev. 02: 1,336 ± 2,5%, faixa 1,303–1,370) e 272 itens contra 268 ativos na Rev. 02. O teor de agente está fixo no código como <b>ciclopentano 9,71%</b>, mas desde 16/10/2026 o regime vigente é n-pentano 9,15%.</p>
+      <p class="ev">app_tablet.py:398 (texto fixo "9,71 % em peso") · planilha derivada: Pressao_Injecao, Relacao_Iso_Pol</p></div>
+
+    <div class="f high"><div class="hd"><span class="pill high">alto</span><h3>Massa frio/calor escolhida pelo clima da internet</h3></div>
+      <p>O app consulta a temperatura externa (Open-Meteo) e troca sozinho para massa frio abaixo de 22 °C ou calor acima de 28 °C. A ficha Rev. 02 diz que a condição é definida pela supervisão de produção, e os limiares 22/28 não constam em nenhum documento. A massa sugerida ao operador pode não ser a que a supervisão determinou.</p>
+      <p class="ev">app_tablet.py:175-190 · src/services/processo_service.py:24-36</p></div>
+
+    <div class="f high"><div class="hd"><span class="pill high">alto</span><h3>Resistência à compressão estimada sempre "APROVADO"</h3></div>
+      <p>A coluna estimada vai de 174 a 279 kPa e marca os 272 itens como aprovados. Ela é calculada sobre a densidade moldada de injeção (38–50 kg/m³), não sobre a densidade de núcleo. Os ensaios Dow medem núcleo de 31,8 a 38,5 kg/m³ e médias de 106 a 220 kPa; em 14/04/2026 houve média de 121,8 kPa e ponto individual de 94,6 kPa, abaixo do mínimo de 110. O indicador passa uma segurança que os ensaios não confirmam.</p></div>
+
+    <div class="f high"><div class="hd"><span class="pill high">alto</span><h3>Alerta de densidade do app modular marca tudo como crítico</h3></div>
+      <p><span class="mono">Alerta_Densidade</span> compara massa ÷ volume (≈ 38–50 kg/m³) com limites 0,10–0,80. Todo item sai "CRÍTICO".</p>
+      <p class="ev">src/services/processo_service.py:39-41</p></div>
+
+    <div class="f high"><div class="hd"><span class="pill high">alto</span><h3>Formulários não correspondem aos registros de campo</h3></div>
+      <ul class="clean">
+        <li><b>Reatividade:</b> o legado não tem vazões poliol/iso, massa injetada e medida, massas do cubo, material/lote nem cálculo automático da densidade livre; o modular usa limites fixos 10–25 s (creme) e 40–70 s (gel), diferentes da especificação 5 s e 40–55 s, e não registra pega.</li>
+        <li><b>Pesagem:</b> calcula a diferença contra a massa <i>programada</i>; o caderno de campo usa a massa <i>injetada</i> do CLP. O modelo é texto livre ("ILHA 2100 C SÓLIDA"), sem vínculo com o código do item.</li>
+        <li><b>Térmico:</b> pontos de medição fixos no código, sem hora, sem faixa de especificação e sem limite para estufas. O gráfico do laudo não mostra a faixa 40–50 °C.</li>
+        <li><b>Inspeção:</b> tolerância de pesagem fixa em ±50 g, enquanto as diferenças reais de campo ficam entre 61 e 311 g.</li>
+      </ul></div>
+
+    <div class="f high"><div class="hd"><span class="pill high">alto</span><h3>Dois aplicativos, duas bases, nenhuma completa</h3></div>
+      <p>O legado tem as telas úteis e grava em Excel. O modular tem arquitetura melhor, mas telas genéricas e a Home afirma "Refatoração concluída". O script de migração grava a data da migração no lugar da data original do registro.</p>
+      <p class="ev">src/pages/home.py · scripts/migrate_excel_to_sqlite.py:35</p></div>
+
+    <div class="f high"><div class="hd"><span class="pill high">alto</span><h3>Horário em UTC no app modular</h3></div>
+      <p>Os lançamentos usam <span class="mono">datetime.utcnow()</span>: tudo registrado depois das 21 h cai no dia seguinte. Relatórios por turno e por dia ficam errados.</p></div>
+
+    <div class="f high"><div class="hd"><span class="pill high">alto</span><h3>Relatórios despejam o histórico inteiro</h3></div>
+      <p>Os laudos de pesagem e reatividade copiam todas as linhas da planilha para o Word, sem filtro de período, cabeçote ou item, sem faixa de especificação e sem estatística. O documento cresce sem limite e não mostra o que está fora.</p></div>
+
+    <div class="f"><div class="hd"><span class="pill med">médio</span><h3>Pontos de manutenção</h3></div>
+      <ul class="clean">
+        <li>Tabela genérica <span class="mono">measurements</span> com JSON: não valida campos e dificulta consultas e relatórios.</li>
+        <li>Streamlit fixado em 1.39.0 (2024); <span class="mono">pytest</span> fora do ambiente padrão.</li>
+        <li>Cerca de 1/3 do código e dos testes é o componente de câmera; bom trabalho, mas desproporcional ao núcleo de processo, que tem poucos testes de regra técnica.</li>
+        <li>Banco e esquema reabertos a cada tela (<span class="mono">get_settings()</span> e <span class="mono">init_schema()</span> por render).</li>
+      </ul></div>
+  </div>
+</section>
+
+<section id="campo">
+  <h2>Achados nos dados de processo</h2>
+  <p>Comparação dos registros de campo com a especificação da Rev. 02. Isso é o que o novo app deve sinalizar no momento do lançamento.</p>
+  <div class="note">Valores lidos das fotos de formulários manuscritos. Algumas leituras podem estar erradas; confirme nos originais antes de agir sobre um número específico.</div>
+
+  <h3>Reatividade · DOC 0001/15 (29/10 a 13/11/2026, 22 ensaios)</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Parâmetro</th><th>Especificação Rev. 02</th><th>Cabeçote 1</th><th>Cabeçote 2</th><th>Situação</th></tr></thead>
+    <tbody>
+      <tr><td>Densidade livre</td><td class="num">24,0–26,0 (Cab. 1) · 24,0–27,0 (Cab. 2) kg/m³</td><td class="num bad">26,7–27,9</td><td class="num okc">25,2–26,7</td><td><span class="pill crit">Cab. 1 fora em 11 de 11</span></td></tr>
+      <tr><td>Relação iso/poliol</td><td class="num">1,303–1,370</td><td class="num bad">1,343–1,379</td><td class="num okc">1,336–1,341</td><td><span class="pill high">Cab. 1 no limite ou acima em ~metade</span></td></tr>
+      <tr><td>Tempo de pega</td><td class="num">55–75 s</td><td class="num bad">74–82 s</td><td class="num bad">74–85 s</td><td><span class="pill high">acima em 16 de 22</span></td></tr>
+      <tr><td>Tempo de gel</td><td class="num">40–55 s</td><td class="num okc">48–51 s</td><td class="num okc">49–51 s</td><td><span class="pill ok">conforme</span></td></tr>
+      <tr><td>Tempo de creme</td><td class="num">5 s</td><td class="num okc">5 s</td><td class="num okc">5 s</td><td><span class="pill ok">conforme</span></td></tr>
+      <tr><td>Temperatura poliol/iso</td><td class="num">23 ± 3 °C</td><td class="num okc">21–25 °C</td><td class="num okc">21–24 °C</td><td><span class="pill ok">conforme</span></td></tr>
+      <tr><td>Massa medida × injetada</td><td>sem tolerância definida</td><td class="num bad">+7 a +22 g (≈ +3%)</td><td class="num">−27 a +6 g</td><td><span class="pill high">Cab. 1 sempre acima</span></td></tr>
+    </tbody>
+  </table></div>
+  <ul class="clean">
+    <li>A coluna "Proporção Poliol/Iso" mistura grandezas: pares como 1281/1714 somam ≈ 3.000 (vazão do Cab. 2 em g/s), 277/372 somam ≈ 650 (vazão do Cab. 1), e 232/318 somam ≈ 550, igual à massa injetada (gramas do tiro). O formulário novo precisa de campos separados e com unidade.</li>
+    <li>A densidade livre segue a fórmula massa do cubo ÷ massa imersa × 1000 (ex.: 34 ÷ 1315 × 1000 = 25,9). O app calcula sozinho e elimina erro de conta.</li>
+    <li>Densidade livre do Cab. 1 sistematicamente acima de 26 e massa medida ≈ 3% acima da injetada apontam para calibração de vazão ou relação do Cab. 1, ou para uma faixa de especificação que precisa ser revista. A decisão é técnica; o app só deixa isso visível todo dia.</li>
+  </ul>
+
+  <h3>Pesagem de peças (29/10 a 13/11/2026, 12 pesagens)</h3>
+  <ul class="clean">
+    <li>Todas as 12 peças pesaram mais que a massa injetada informada pelo CLP: de <b>+61 a +311 g</b>, média <b>+181 g (≈ +1,4%)</b>. O tanque 2500 VRI teve a maior diferença (+311 g sobre 19.589 g).</li>
+    <li>A balança registra com resolução de 0,1 kg. Cada diferença carrega cerca de ±70 g de incerteza, o mesmo tamanho dos desvios que se quer medir. Uma balança com resolução de 10 g tornaria a pesagem conclusiva. O viés positivo em 12 de 12 é consistente, então a tendência existe.</li>
+    <li>Na linha de 29/10 a conta manuscrita dá +66 g; 14.400 − 14.339 = +61 g. Pequeno, mas mostra o valor do cálculo automático.</li>
+  </ul>
+
+  <h3>Controle térmico (WhatsApp, 13/11/2026 08:21)</h3>
+  <ul class="clean">
+    <li>Moldes, especificação 45 ± 5 °C: <b>M2 coração 39 °C, abaixo do mínimo</b>; Molde tanque 4 fundo 40 °C no limite. Média dos 19 pontos de molde ≈ 42 °C, na metade inferior da faixa.</li>
+    <li>Estufas (cabeceira 36, tanque 39, ilha interna 37, ilha externa 32 °C) não têm faixa definida na Rev. 02. Sem faixa, o app não consegue avaliar.</li>
+    <li>Hoje o Junior digita no WhatsApp e alguém redigita no app. Com o lançamento direto no celular, o app gera o texto pronto para colar no grupo.</li>
+  </ul>
+
+  <h3>Ensaios de laboratório Dow na pasta do Drive</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Injeção</th><th>Peça</th><th>Massa injetada</th><th>Densidade núcleo média (faixa)</th><th>Compressão 10% média (faixa)</th><th>Fator K</th></tr></thead>
+    <tbody>
+      <tr><td class="num">23/02/2026</td><td>Ilha 2500 central vidro · ID 1539</td><td class="num">12,990 kg</td><td class="num">34,7 (33,2–36,4)</td><td class="num">148,8 (135,8–169,4)</td><td class="num">22,42</td></tr>
+      <tr><td class="num">14/04/2026</td><td>Ilha 2500 central sólida</td><td class="num">14,060 kg</td><td class="num bad">33,8 (31,8–37,3)</td><td class="num bad">121,8 (105,9–144,2)</td><td class="num">22,91</td></tr>
+      <tr><td class="num">22/06/2026</td><td>Ilha 1850 terminal sólida</td><td class="num">11,370 kg</td><td class="num">34,8 (33,0–36,7)</td><td class="num">159,9 (136,8–190,3)</td><td class="num">22,62</td></tr>
+      <tr><td class="num">21/08/2026</td><td>Ilha 2500 central sólida · ID 1652</td><td class="num">15,266 kg</td><td class="num okc">37,3 (36,0–38,5)</td><td class="num okc">200,5 (185,8–219,7)</td><td class="num">22,23</td></tr>
+      <tr><td class="num">09/10/2026</td><td>Ilha 2500 central sólida · ID 1686</td><td class="num">14,309 kg</td><td class="num">35,1 (33,6–36,7)</td><td class="num">175,6 (162,0–198,2)</td><td class="num bad">24,53</td></tr>
+    </tbody>
+  </table></div>
+  <ul class="clean">
+    <li>Na mesma ilha 2500 central sólida, mais massa resultou em mais núcleo e mais compressão: 14,06 kg → 121,8 kPa; 14,31 kg → 175,6 kPa; 15,27 kg → 200,5 kPa. A massa programada atual é 14,35 kg. Com os ensaios ligados à massa injetada e ao item, o app mostra essa relação por modelo.</li>
+    <li>O ensaio de 09/10/2026 foi injetado 4 dias depois do início do n-pentano (05/10) e tem o pior fator K da série: 24,53 contra 22,2–22,9 mW/m·K, cerca de 9% acima. É uma amostra só, mas é coerente com a perda de isolamento citada no estudo HFO e merece confirmação.</li>
+    <li>O estudo HFO cita 17 ensaios desde 2022; só 5 estão na pasta. Os demais precisam ser carregados para o histórico ficar completo.</li>
+    <li>Três relatórios registram bolhas internas e dois apontam possível falha de mistura (duas colorações no corte). O app deve guardar essas observações como ocorrências ligadas ao ensaio.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Onde hospedar</h2>
+  <p>Requisitos: cerca de 10 usuários em celular e tablet na fábrica, HTTPS (obrigatório para a câmera), banco que não perca dados, login individual, perfis e backup. O volume é pequeno: algumas dezenas de lançamentos por dia e fotos de inspeção.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Opção</th><th>Custo/mês aprox.</th><th>A favor</th><th>Contra</th></tr></thead>
+    <tbody>
+      <tr><td><b>A. Streamlit Cloud + Supabase</b> (recomendada)<br><span class="muted">app Python atual reaproveitado; banco Postgres, login e fotos no Supabase</span></td><td class="num">US$ 25–32</td><td>Reaproveita cálculos e laudos em Python. Postgres com backup diário, autenticação pronta, regras de acesso no próprio banco, armazenamento de fotos.</td><td>Streamlit é menos fluido no celular que um app nativo. Precisa de cuidado com a tela em tablets.</td></tr>
+      <tr><td>B. Streamlit Cloud + Supabase grátis</td><td class="num">US$ 0</td><td>Começa sem custo.</td><td>O projeto pausa após 7 dias sem uso e não tem backup automático; o app dorme quando ocioso. Exige exportação noturna para o Drive.</td></tr>
+      <tr><td>C. Next.js (PWA) + Supabase na Vercel</td><td class="num">US$ 45</td><td>Melhor experiência no celular, funciona como app instalado, pode lançar sem sinal e sincronizar depois.</td><td>Reescrita completa em outra linguagem. Mais tempo e manutenção.</td></tr>
+      <tr><td>D. Google AppSheet + Google Sheets</td><td class="num">≈ US$ 50 (10 × US$ 5)</td><td>Sem código, integrado ao Drive, funciona offline.</td><td>Planilha como banco limita integridade e concorrência. Cálculos de processo, cartas de controle e laudos ficam pobres.</td></tr>
+      <tr><td>E. PC na fábrica (como hoje, <span class="mono">iniciar_app.bat</span>)</td><td class="num">US$ 0</td><td>Nenhuma dependência externa.</td><td>Sem HTTPS, sem acesso fora da rede, sem backup, ponto único de falha.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="grid2">
+    <div class="card rec">
+      <h3>Recomendação: opção A</h3>
+      <ul>
+        <li><b>Supabase Pro</b> (US$ 25): PostgreSQL, login por e-mail, armazenamento de fotos e PDFs, backup diário com 7 dias de retenção, região São Paulo.</li>
+        <li><b>App Streamlit</b> no Streamlit Community Cloud (grátis) para começar. Se precisar de domínio próprio ou app sempre acordado, mover para Render Starter (US$ 7).</li>
+        <li>Exportação semanal automática do banco para uma pasta do seu Drive como cópia extra.</li>
+        <li>Se o uso no celular ficar ruim, a opção C reaproveita o mesmo banco: troca só a tela.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Perfis de acesso</h3>
+      <ul>
+        <li><b>Administrador</b> (só você): cadastros, limites, revisões, regimes de agente, usuários; corrige ou anula qualquer lançamento.</li>
+        <li><b>Operador/Qualidade</b> (≈ 9 pessoas): consulta tudo, cria lançamentos, anexa fotos, abre anomalia. Não edita nem apaga.</li>
+        <li>Erro de lançamento: o operador marca "solicitar correção" com o motivo; você aprova. O valor original fica no histórico.</li>
+        <li>As regras ficam no banco (Row Level Security), não só na tela: mesmo com acesso direto à API, um operador não altera nada.</li>
+      </ul>
+    </div>
+  </div>
+  <p class="muted">Preços de referência em novembro/2026, em dólar; confira na contratação.</p>
+</section>
+
+<section>
+  <h2>Banco de dados proposto</h2>
+  <p>A planilha Rev. 02 passa a ser importada para o banco a cada nova revisão. Cada lançamento guarda a revisão vigente naquele dia, então um ensaio de outubro é sempre avaliado contra os limites de outubro.</p>
+  <pre class="mermaid">
+erDiagram
+  REVISAO ||--o{ PARAMETRO_CABECOTE : define
+  REVISAO ||--o{ ITEM_MASSA : define
+  REVISAO ||--o{ LIMITE : define
+  REGIME_AGENTE ||--o{ REVISAO : "vigente em"
+  ITEM ||--o{ ITEM_MASSA : tem
+  ITEM ||--o{ PESAGEM : pesado
+  ITEM ||--o{ ENSAIO_LAB : ensaiado
+  ENSAIO_LAB ||--o{ ENSAIO_LAB_PONTO : "peça e posição A-E"
+  LOTE_MP ||--o{ ENSAIO_REATIVIDADE : usado
+  LOTE_MP ||--o{ VISCOSIDADE : medido
+  PONTO_TERMICO ||--o{ LEITURA_TERMICA : lido
+  MEDICAO_TERMICA ||--o{ LEITURA_TERMICA : contem
+  USUARIO ||--o{ ENSAIO_REATIVIDADE : lanca
+  USUARIO ||--o{ PESAGEM : lanca
+  USUARIO ||--o{ MEDICAO_TERMICA : lanca
+  INSPECAO ||--o{ FOTO : anexa
+  ANOMALIA ||--o{ ACAO_5W1H : planeja
+  ANOMALIA }o--o| ENSAIO_LAB : origem
+  ANOMALIA }o--o| ENSAIO_REATIVIDADE : origem
+  </pre>
+  <div class="tbl"><table>
+    <thead><tr><th>Tabela</th><th>Campos principais</th><th>Origem dos dados</th></tr></thead>
+    <tbody>
+      <tr><td>revisao</td><td>documento, número, data, arquivo no Drive, autor, descrição</td><td>Capa e Histórico da Rev. 02 (19 alterações desde 2022)</td></tr>
+      <tr><td>regime_agente</td><td>agente, % na pré-mistura, partes, % na espuma, densidade, vigência</td><td>Ciclopentano 9,71% · n-pentano 9,30% · n-pentano 9,15%</td></tr>
+      <tr><td>parametro_cabecote</td><td>cabeçote, vazão ± tol., pressão, temperaturas, creme/gel/pega, densidade livre, cura, compressão mín.</td><td>Aba Parâmetros, seção 3</td></tr>
+      <tr><td>item · item_massa</td><td>código, descrição, expositor, família, cabeçote, volume, densidade moldada, fatores e massas frio/calor, status, massa da revisão anterior</td><td>Aba Massas (142 itens Cab. 1, 126 Cab. 2)</td></tr>
+      <tr><td>material · lote_mp · viscosidade</td><td>CR 2610, CE 164, agentes; lote, validade, viscosidade por temperatura</td><td>TDS Dow, curva de viscosidade</td></tr>
+      <tr><td>ensaio_reatividade</td><td>data/hora, cabeçote, vazão poliol e iso, massa injetada e medida, cubo seco e imerso, creme, gel, pega, lote, temperaturas; densidade livre e relação calculadas; status</td><td>DOC 0001/15</td></tr>
+      <tr><td>pesagem</td><td>data, item, tara, bruto, massa programada, massa injetada CLP, condição frio/nominal/calor; real e diferenças calculadas</td><td>Caderno de pesagem</td></tr>
+      <tr><td>ponto_termico · medicao_termica · leitura_termica</td><td>molde/estufa, posição, faixa; data, hora, responsável; valor</td><td>WhatsApp diário (19 pontos de moldes + 4 estufas)</td></tr>
+      <tr><td>ensaio_lab · ensaio_lab_ponto</td><td>laboratório, ID do relatório, datas, item, massa injetada, fator K, observações; peça, posição, densidade, compressão, outlier</td><td>5 relatórios Dow no Drive + 12 a localizar</td></tr>
+      <tr><td>inspecao · foto</td><td>pilares manutenção, pesagem, qualidade, segurança; fotos no armazenamento</td><td>Inspeção semanal do legado</td></tr>
+      <tr><td>anomalia · acao_5w1h</td><td>ocorrência, origem, responsável, prazo, status, ações e histórico</td><td><span class="mono">Log_Registro_Anomalias.xlsx</span></td></tr>
+      <tr><td>documento</td><td>tipo (TDS, FDS, estudo, ficha), material, link no Drive, validade</td><td>14 PDFs de referência na pasta</td></tr>
+      <tr><td>auditoria</td><td>usuário, data, tabela, registro, valor anterior e novo, motivo</td><td>Gerado automaticamente em toda alteração</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>Telas</h2>
+  <div class="grid2">
+    <div class="card"><h3>Lançamento (operador, celular)</h3><ul>
+      <li><b>Reatividade DOC 0001/15:</b> um campo por grandeza, com unidade; densidade livre, relação e diferença de massa calculadas na hora; cada valor fica verde, âmbar ou vermelho contra a faixa do cabeçote.</li>
+      <li><b>Térmico diário:</b> grade dos 23 pontos já preenchida com a leitura anterior; botão "copiar resumo para WhatsApp".</li>
+      <li><b>Pesagem:</b> busca do item por código ou descrição; massa do CLP; diferença automática.</li>
+      <li><b>Inspeção semanal</b> com fotos (componente de câmera atual aproveitado).</li>
+      <li><b>Anomalia</b> aberta direto de um valor fora da faixa, já com a origem preenchida.</li>
+    </ul></div>
+    <div class="card"><h3>Consulta (todos)</h3><ul>
+      <li><b>Ficha do item:</b> massa nominal/frio/calor, divisão iso/poliol/agente, vazão e tempo, densidade moldada, revisão vigente, últimas pesagens e ensaios.</li>
+      <li><b>Painel do dia:</b> o que foi lançado, o que está fora, o que falta lançar.</li>
+      <li><b>Históricos</b> filtráveis por período, cabeçote, item e responsável, com exportação Excel.</li>
+      <li><b>Biblioteca técnica:</b> TDS, FDS e fichas de injeção vigentes.</li>
+    </ul></div>
+    <div class="card"><h3>Administração (só você)</h3><ul>
+      <li>Importar nova revisão da planilha de massas, com comparativo do que mudou antes de publicar.</li>
+      <li>Trocar o regime de agente expansor vigente.</li>
+      <li>Cadastrar faixas (incluindo estufas), usuários e pontos de medição.</li>
+      <li>Aprovar correções e anular lançamentos, com motivo.</li>
+      <li>Lançar ensaios de laboratório recebidos da Dow.</li>
+    </ul></div>
+  </div>
+</section>
+
+<section>
+  <h2>Relatórios</h2>
+  <h3>Revisão dos relatórios atuais</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Relatório atual</th><th>Problema</th><th>Destino</th></tr></thead>
+    <tbody>
+      <tr><td>Laudo de pesagem (Word)</td><td>Histórico inteiro, diferença contra massa programada, sem estatística</td><td>Substituído pelo relatório 4</td></tr>
+      <tr><td>Laudo de reatividade (Word)</td><td>Histórico inteiro, sem faixas nem status</td><td>Substituído pelo relatório 2</td></tr>
+      <tr><td>Laudo térmico por medição (Word + gráfico)</td><td>Gráfico sem faixa 40–50 °C; estufas sem limite</td><td>Substituído pelo relatório 3</td></tr>
+      <tr><td>Laudo de inspeção semanal (Word + fotos)</td><td>Bom conteúdo; tolerância de ±50 g fixa</td><td>Mantido, em PDF, limites da revisão</td></tr>
+      <tr><td>Laudo de anomalia 5W1H (Word)</td><td>Sem histórico de ações e de prazos</td><td>Mantido, com histórico</td></tr>
+      <tr><td>Painel de produção (tela)</td><td>Parâmetros desatualizados; compressão estimada sem base</td><td>Vira a Ficha do item; compressão estimada removida</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Catálogo proposto</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Relatório</th><th>Conteúdo</th><th>Frequência</th><th>Formato</th></tr></thead>
+    <tbody>
+      <tr><td>1. Fichas de injeção Cab. 1 e Cab. 2</td><td>Mesma ficha da Rev. 02, gerada do banco, com regime vigente e aviso de cópia controlada</td><td>A cada revisão</td><td>PDF</td></tr>
+      <tr><td>2. Carta de controle de reatividade</td><td>Densidade livre, relação iso/poliol, creme, gel, pega, massa medida/injetada por cabeçote, com faixas, média, desvio, Cpk e pontos fora</td><td>Semanal e mensal</td><td>PDF + Excel</td></tr>
+      <tr><td>3. Mapa térmico de moldes e estufas</td><td>Ponto × dia com cor por faixa; % de leituras fora; tendência por molde</td><td>Semanal</td><td>PDF</td></tr>
+      <tr><td>4. Pesagem de peças</td><td>Real × injetada × programada por item; viés médio; relação com condição frio/calor e temperatura</td><td>Semanal e mensal</td><td>PDF + Excel</td></tr>
+      <tr><td>5. Ensaios de laboratório</td><td>Histórico de núcleo, compressão e fator K; densidade × compressão; massa injetada × resultado por modelo; pontos abaixo de 110 kPa</td><td>A cada ensaio + consolidado</td><td>PDF</td></tr>
+      <tr><td>6. Boletim diário do turno</td><td>Tudo que foi lançado no dia, desvios e pendências; texto para WhatsApp e e-mail</td><td>Diário, automático</td><td>Texto + PDF</td></tr>
+      <tr><td>7. Anomalias</td><td>Abertas, vencidas, tempo de fechamento, Pareto por origem e equipamento</td><td>Semanal</td><td>PDF</td></tr>
+      <tr><td>8. Consumo e custo de matéria-prima</td><td>Massas × produção → iso, poliol e agente; comparativo de regimes (ciclopentano, n-pentano, HFO)</td><td>Mensal (exige lançar produção por item)</td><td>Excel</td></tr>
+      <tr><td>9. Controle de revisões</td><td>O que mudou entre revisões: massas, faixas, parâmetros, com Δ%</td><td>A cada revisão</td><td>PDF</td></tr>
+      <tr><td>10. Lotes de matéria-prima</td><td>Validade, viscosidade, ensaios vinculados ao lote</td><td>Sob demanda</td><td>PDF</td></tr>
+      <tr><td>11. Relatório executivo mensal</td><td>Indicadores: % de lançamentos conformes por controle, anomalias, ensaios, custo; para a gerência ARIAM</td><td>Mensal</td><td>PDF</td></tr>
+    </tbody>
+  </table></div>
+  <p class="muted">PDF passa a ser o formato padrão de laudo (não editável, pronto para assinar). Word fica disponível onde você quiser editar antes de enviar.</p>
+</section>
+
+<section>
+  <h2>Plano de execução</h2>
+  <ol class="phases">
+    <li><h3>Contenção · 1 semana</h3><ul>
+      <li>Backup das planilhas <span class="mono">Log_*.xlsx</span> e da pasta de fotos da máquina da fábrica.</li>
+      <li>Remover planilhas de log e e-mails do repositório e do histórico do Git; trocar senhas e a senha de app do SMTP.</li>
+      <li>Corrigir no app legado o texto fixo de ciclopentano e apontar a tela de produção para a Rev. 02.</li>
+    </ul></li>
+    <li><h3>Base de dados e acesso · 2 a 3 semanas</h3><ul>
+      <li>Criar o projeto Supabase, as tabelas e as regras de acesso por perfil.</li>
+      <li>Importador da planilha de massas (Rev. 02 e futuras) com comparativo.</li>
+      <li>Migrar logs, anomalias e os 5 ensaios Dow com as datas originais.</li>
+      <li>Login individual dos 10 usuários.</li>
+    </ul></li>
+    <li><h3>Lançamento e consulta · 3 a 4 semanas</h3><ul>
+      <li>Formulários de reatividade, térmico, pesagem, inspeção e anomalia com validação contra a revisão vigente.</li>
+      <li>Ficha do item, painel do dia, históricos e biblioteca técnica.</li>
+      <li>Duas semanas em paralelo com o papel e o WhatsApp; depois o app passa a ser o registro oficial.</li>
+    </ul></li>
+    <li><h3>Relatórios e automação · 2 a 3 semanas</h3><ul>
+      <li>Relatórios 1 a 7 e 9 a 11; relatório 8 quando a produção por item for lançada.</li>
+      <li>Boletim diário automático por e-mail; exportação semanal do banco para o Drive.</li>
+      <li>Módulo de acompanhamento do teste industrial com HFO (CD 1299), se aprovado.</li>
+    </ul></li>
+  </ol>
+</section>
+
+<section>
+  <h2>Decisões que dependem de você</h2>
+  <ul class="clean">
+    <li><b>Hospedagem:</b> opção A paga (≈ US$ 32/mês) ou começar pela B gratuita, aceitando pausa e sem backup automático.</li>
+    <li><b>Faixas de especificação:</b> densidade livre do Cab. 1 (24–26 está sendo excedida em todo ensaio), pega livre (55–75 s), estufas (sem faixa) e tolerância de massa medida × injetada.</li>
+    <li><b>Massa frio/calor:</b> confirmar que a escolha fica com a supervisão e remover a troca automática pelo clima.</li>
+    <li><b>Correções:</b> operador pode corrigir o próprio lançamento por algumas horas, ou toda correção passa por você.</li>
+    <li><b>Produção por item:</b> se alguém vai lançar quantidades produzidas, o que habilita o relatório de consumo e custo.</li>
+    <li><b>Ensaios antigos:</b> localizar os 12 relatórios Dow que não estão na pasta.</li>
+  </ul>
+</section>
+
+<footer>
+  <p>Achados de código verificados no commit dddecb6 do repositório. Números de laboratório transcritos dos PDFs da pasta do Drive. Dados de reatividade, pesagem e térmico lidos de fotos de registros manuscritos e sujeitos a erro de leitura.</p>
+</footer>
+
+</div>
