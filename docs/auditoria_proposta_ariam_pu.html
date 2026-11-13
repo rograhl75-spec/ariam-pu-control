@@ -441,11 +441,25 @@ erDiagram
     <li><b>Hospedagem:</b> gratuita (Supabase Free + Streamlit Community Cloud). Cópia noturna automática do banco para o Drive; fotos comprimidas para caber em 1 GB; o primeiro acesso do dia pode levar até 1 minuto para o app acordar.</li>
     <li><b>Massa frio/calor:</b> o app sugere a condição pela temperatura externa e mostra o motivo; a supervisão confirma ou troca, e a escolha fica registrada.</li>
     <li><b>Escopo inicial:</b> só controle de processo. Consumo e custo de matéria-prima ficam para depois.</li>
+    <li><b>Correções:</b> o operador corrige o próprio lançamento até 2 horas depois de salvar (prazo ajustável por você). Depois disso, só o administrador. Valor original, valor novo, autor e hora ficam no histórico.</li>
+    <li><b>Faixas de reatividade e densidade livre:</b> revistas pelo histórico do DOC 0001/15 (tabela abaixo), para registrar na Rev. 03 da planilha de parâmetros.</li>
   </ul>
+  <h3>Faixas propostas para a Rev. 03</h3>
+  <p class="muted">Base: 22 ensaios de 29/10 a 13/11/2026 (11 por cabeçote), regime n-pentano 9,15%, valores lidos da foto do formulário. Faixa = média ± 3 desvios-padrão, arredondada.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Parâmetro</th><th>Rev. 02</th><th>Histórico (média · mín–máx)</th><th>Proposta Rev. 03</th></tr></thead>
+    <tbody>
+      <tr><td>Densidade livre Cab. 1</td><td class="num">24,0–26,0 kg/m³</td><td class="num">27,4 · 26,7–27,9</td><td class="num"><b>26,3–28,4 kg/m³</b></td></tr>
+      <tr><td>Densidade livre Cab. 2</td><td class="num">24,0–27,0 kg/m³</td><td class="num">25,8 · 25,2–26,7</td><td class="num">24,5–27,0 kg/m³ (sem mudança prática)</td></tr>
+      <tr><td>Pega livre (Cab. 1 e 2)</td><td class="num">55–75 s</td><td class="num">78 · 74–85</td><td class="num"><b>69–86 s</b></td></tr>
+      <tr><td>Gel (Cab. 1 e 2)</td><td class="num">40–55 s</td><td class="num">50 · 48–51</td><td class="num">40–55 s mantida; alerta interno fora de 47–53 s</td></tr>
+      <tr><td>Creme (Cab. 1 e 2)</td><td class="num">5 s</td><td class="num">5 · 5–5</td><td class="num">4–6 s (resolução do cronômetro)</td></tr>
+      <tr><td>Relação iso/poliol</td><td class="num">1,303–1,370</td><td class="num">Cab. 1: 1,343–1,379</td><td class="num">Mantida: é set-point de máquina; ajustar o Cab. 1</td></tr>
+    </tbody>
+  </table></div>
   <h2>Decisões pendentes</h2>
   <ul class="clean">
-    <li><b>Faixas de especificação:</b> densidade livre do Cab. 1 (24–26 está sendo excedida em todo ensaio), pega livre (55–75 s), estufas (sem faixa) e tolerância de massa medida × injetada.</li>
-    <li><b>Correções:</b> operador pode corrigir o próprio lançamento por algumas horas, ou toda correção passa por você.</li>
+    <li><b>Estufas e massa medida × injetada:</b> ainda sem faixa definida.</li>
     <li><b>Ensaios antigos:</b> localizar os 12 relatórios Dow que não estão na pasta.</li>
   </ul>
 </section>
