@@ -20,10 +20,33 @@ Aplicação Streamlit para controle de produção PU com arquitetura modular, pe
 - `src/pages/*`: páginas Streamlit
 - `scripts/migrate_excel_to_sqlite.py`: migração de logs legados
 
+## Planilha de parâmetros e massas (fonte única)
+
+O app legado (`app_tablet.py`) lê a planilha controlada
+`59001000100_Parametros_e_Massas_PU_RevNN_AAAA-MM-DD.xlsx` da pasta indicada em
+`[processo] pasta_planilhas` e usa sempre a revisão de maior número. A planilha **não**
+fica no repositório: copie a revisão vigente do Drive para a pasta do app no computador
+da fábrica. O regime de agente expansor em uso é definido em `[processo] regime`.
+
+A condição de massa (nominal, frio ou calor) é **sugerida** pela temperatura externa;
+quem decide é a supervisão de produção, escolhendo na tela.
+
+Fichas de injeção em PDF, geradas da planilha:
+
+```bash
+python scripts/gerar_fichas_injecao.py 59001000100_Parametros_e_Massas_PU_Rev03_2026-11-13.xlsx --saida fichas
+```
+
+## Dados fora do Git
+
+Nenhuma planilha (`*.xlsx`, `*.csv`), foto ou `secrets.toml` deve ser versionada: o
+repositório é público. Os registros de campo (`Log_*.xlsx`, `fotos_inspecoes/`) ficam
+no computador da fábrica e devem ter cópia de segurança.
+
 ## Configuração
 
 1. Copie `.streamlit/secrets.example.toml` para `.streamlit/secrets.toml`
-2. Gere hashes de senha:
+2. Gere hashes de senha (o app legado e o modular usam o mesmo bloco `[users]`; senhas em texto puro não são mais aceitas):
 
 ```bash
 python -c "from src.auth_service import AuthService; print(AuthService.hash_password('SUA_SENHA'))"

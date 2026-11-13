@@ -9,6 +9,7 @@ from email.mime.multipart import MIMEMultipart
 import io
 import json
 from pathlib import Path
+from src.rev_parametros import carregar_revisao, formatar, localizar_revisao_vigente, sugerir_condicao
 from ui.photo_evidence import photo_paths, render_photo_evidence, reset_photo_evidence, save_photos
 
 try:
@@ -30,15 +31,25 @@ except ImportError:
 
 st.set_page_config(page_title="Grahl PU Control 4.0", page_icon="🏭", layout="wide")
 
+def _secao_secrets(nome: str) -> dict:
+    if not st.secrets.load_if_toml_exists():
+        return {}
+    return dict(st.secrets.get(nome, {}))
+
+
 def verificar_senha():
     def senha_correta():
+        from src.auth_service import AuthService
+
         usuario = st.session_state["username"].strip()
         senha = st.session_state["password"]
-        usuarios_cadastrados = st.secrets.get("passwords", {})
-        if usuario in usuarios_cadastrados and usuarios_cadastrados[usuario] == senha:
+        usuarios_cadastrados = {k: dict(v) for k, v in _secao_secrets("users").items()}
+        resultado = AuthService(usuarios_cadastrados).authenticate(usuario, senha)
+        del st.session_state["password"]
+        if resultado.authenticated:
             st.session_state["senha_correta"] = True
             st.session_state["usuario_atual"] = usuario
-            del st.session_state["password"]
+            st.session_state["perfil"] = resultado.role
         else:
             st.session_state["senha_correta"] = False
 
@@ -164,47 +175,72 @@ if st.sidebar.button("🚪 Sair do Sistema", use_container_width=True):
 
 st.markdown("---")
 
-if not os.path.exists("Relatorio_Processo_Injecao_Atualizado.xlsx"):
-    try:
-        __import__("automacao_grahl")
-    except Exception as e:
-        st.error(f"Erro crítico ao gerar base de dados automática: {e}")
-        st.stop()
+_cfg_processo = _secao_secrets("processo")
+_cfg_clima = _secao_secrets("weather")
+REGIME_VIGENTE = _cfg_processo.get("regime", "n-Pentano 9,15% (provisório)")
+MAQUINAS = {
+    1: _cfg_processo.get("maquina_cab1", "Cabeçote 1 (RFG) — Krauss Maffei 40/40"),
+    2: _cfg_processo.get("maquina_cab2", "Cabeçote 2 — Krauss Maffei 80/80"),
+}
+
+
+@st.cache_resource(show_spinner=False)
+def _carregar_revisao_cache(caminho: str, modificado: float, regime: str):
+    return carregar_revisao(caminho, regime)
+
+
+try:
+    _arquivo_rev = localizar_revisao_vigente(_cfg_processo.get("pasta_planilhas", "."))
+    REV = _carregar_revisao_cache(str(_arquivo_rev), _arquivo_rev.stat().st_mtime, REGIME_VIGENTE)
+except Exception as e:
+    st.error(
+        "Não foi possível ler a planilha de parâmetros e massas vigente. Copie o arquivo "
+        "59001000100_Parametros_e_Massas_PU_RevNN_AAAA-MM-DD.xlsx para a pasta do aplicativo "
+        f"(ou ajuste [processo] pasta_planilhas em secrets.toml). Detalhe: {e}"
+    )
+    st.stop()
+
 
 @st.cache_data(ttl=600)
 def obter_temp():
+    lat = _cfg_clima.get("latitude", -23.31028)
+    lon = _cfg_clima.get("longitude", -51.16278)
     try:
-        r = requests.get("https://api.open-meteo.com/v1/forecast?latitude=-23.31028&longitude=-51.16278&current_weather=true", timeout=4)
+        r = requests.get(f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true", timeout=4)
         return float(r.json()['current_weather']['temperature'])
     except Exception:
-        return 24.0
+        return None
 
 temp_externa = obter_temp()
+LIMITE_FRIO = float(_cfg_processo.get("limite_frio_c", 22.0))
+LIMITE_CALOR = float(_cfg_processo.get("limite_calor_c", 28.0))
+CONDICAO_SUGERIDA = sugerir_condicao(temp_externa, LIMITE_FRIO, LIMITE_CALOR) if temp_externa is not None else "nominal"
+ROTULO_CONDICAO = {"nominal": "Massa nominal", "frio": "Massa frio", "calor": "Massa calor"}
 
-if temp_externa < 22.0:
-    cond_clima = "❄️ Massa Frio (<22°C)"
-elif temp_externa > 28.0:
-    cond_clima = "🔥 Massa Calor (>28°C)"
+if temp_externa is None:
+    st.sidebar.header("🌡️ Clima externo indisponível")
 else:
-    cond_clima = "✅ Massa Nominal (Estável)"
+    st.sidebar.header(f"🌡️ Clima externo: {temp_externa:.1f} °C")
+st.sidebar.markdown(f"**Sugestão:** {ROTULO_CONDICAO[CONDICAO_SUGERIDA]}")
+st.sidebar.caption(
+    f"Sugestão pela temperatura externa (frio abaixo de {LIMITE_FRIO:g} °C, calor acima de {LIMITE_CALOR:g} °C). "
+    "A condição usada é a definida pela supervisão de produção."
+)
+st.sidebar.caption(f"📄 Parâmetros: {REV.rotulo} · {REV.regime.nome}")
 
-st.sidebar.header(f"🌡️ Clima Externo: {temp_externa} °C")
-st.sidebar.markdown(f"**Status Térmico:** {cond_clima}")
-st.sidebar.caption("💡 **Utilidade:** Monitora a variação térmica ambiente para orientar o operador sobre os ajustes de reatividade e correções de massa no cabeçote.")
-
-try:
-    df_base = pd.read_excel("Relatorio_Processo_Injecao_Atualizado.xlsx")
-except Exception as e:
-    st.error(f"Erro ao ler a planilha de dados: {e}")
-    st.stop()
-
-df_base.columns = [str(c).strip() for c in df_base.columns]
-df_base['Expositor_Filtro'] = df_base['Expositor'].fillna("GERAL").astype(str).str.strip()
-df_base['Componente_Filtro'] = df_base['Componente'].fillna("GERAL").astype(str).str.strip()
-df_base['Codigo_Item_Filtro'] = df_base['Codigo_Item'].fillna("0000").astype(str).str.strip()
-df_base['Descricao_Filtro'] = df_base['Descricao'].fillna("").astype(str).str.strip()
-df_base['Item_Descricao_Completo'] = df_base['Codigo_Item_Filtro'] + " — " + df_base['Descricao_Filtro']
-df_base['Maquina_Filtro'] = df_base['Maquina'].fillna("Krauss Maffei 40/40").astype(str).str.strip()
+df_base = pd.DataFrame(
+    [
+        {
+            "Cabecote": i.cabecote,
+            "Maquina_Filtro": MAQUINAS[i.cabecote],
+            "Expositor_Filtro": i.expositor,
+            "Componente_Filtro": i.componente,
+            "Item_Descricao_Completo": f"{i.codigo} — {i.descricao}",
+            "Item": i,
+        }
+        for i in REV.itens
+    ]
+)
 
 def aplicar_estilo_abadi_e_espacamento(doc):
     if logo_path and os.path.exists(logo_path):
@@ -376,38 +412,55 @@ else:
         dados_p = df_f.iloc[0]
         st.markdown("---")
 
+        item = dados_p["Item"]
+        prm = REV.parametros_cabecote[item.cabecote]
+        opcoes_cond = ["nominal", "frio", "calor"]
+        condicao = st.radio(
+            "Condição de massa definida pela supervisão:",
+            opcoes_cond,
+            index=opcoes_cond.index(CONDICAO_SUGERIDA),
+            format_func=lambda c: ROTULO_CONDICAO[c] + (" (sugerida pelo clima)" if c == CONDICAO_SUGERIDA else ""),
+            horizontal=True,
+            key="condicao_massa_supervisao",
+        )
+        if condicao != CONDICAO_SUGERIDA:
+            st.caption(f"A sugestão pelo clima era **{ROTULO_CONDICAO[CONDICAO_SUGERIDA].lower()}**; vale a escolha da supervisão.")
+        massa = item.massa_condicao(condicao)
+
         col_info1, col_info2 = st.columns(2)
         with col_info1:
             st.markdown(f"### ⚙️ Alvo no CLP — {dados_p['Maquina_Filtro']}")
-            st.info(f"**Expositor:** {dados_p['Expositor_Filtro']} | **Componente:** {dados_p['Componente_Filtro']}\n\n**Item / Descrição:** {dados_p['Item_Descricao_Completo']}")
-            st.write(f"**Volume do Molde:** {dados_p['Volume']} m³")
-            st.write(f"**Condição Climática Ativa:** {dados_p['Condicao_Climatica']}")
-            st.metric("⚖️ MASSA IDEAL NA BALANÇA", f"{dados_p['Massa_Trabalho']:.2f} kg", f"Nominal: {dados_p['Massa_Nominal']} kg")
-            st.metric("⏱️ TEMPO NO TIMER", f"{dados_p['Tempo_Injecao_Seg']:.2f} segundos", f"Vazão Calibrada: {dados_p['Vazao_Cabecote_g_s']} g/s")
+            st.info(f"**Expositor:** {item.expositor} | **Componente:** {item.componente}\n\n**Item / Descrição:** {dados_p['Item_Descricao_Completo']}")
+            st.metric(f"⚖️ {ROTULO_CONDICAO[condicao].upper()} (kg)", formatar(massa), f"Nominal: {formatar(item.massa_kg)} kg", delta_color="off")
+            st.metric("⏱️ TEMPO DE INJEÇÃO (referência)", f"{formatar(item.tempo_injecao_s(condicao), 2)} s",
+                      f"Vazão: {prm.get('Vazão', '')}", delta_color="off")
+            st.caption("O parâmetro de injeção é a massa; o tempo é ajustado pela própria máquina.")
+            st.markdown(
+                f"""
+            | Massa nominal | Massa frio | Massa calor |
+            |---:|---:|---:|
+            | {formatar(item.massa_kg)} kg | {formatar(item.massa_frio_kg)} kg | {formatar(item.massa_calor_kg)} kg |
+            """
+            )
         with col_info2:
-            st.markdown("### 🛠️ Especificações de Processo & Densidades")
+            st.markdown(f"### 🛠️ Parâmetros de processo — {REV.rotulo}")
             st.markdown(f"""
-            * **Injetora:** {dados_p['Maquina_Filtro']}
-            * **Vazão Calibrada:** {dados_p['Vazao_Cabecote_g_s']} g/s
-            * **Pressão de Injeção Alvo:** {dados_p['Pressao_Injecao']}
-            * **Relação I/P (Iso/Poliol):** {dados_p['Relacao_Iso_Pol']}
-            * **Densidade Mínima (Calor / Underpacking):** `{dados_p['Densidade_Calor']:.2f} kg/m³`
-            * **Densidade Nominal (Estável):** `{dados_p['Densidade_Nominal']:.2f} kg/m³`
-            * **Densidade Máxima (Frio / Overpacking):** `{dados_p['Densidade_Frio']:.2f} kg/m³`
-            * **🎯 Densidade Real Injetada (Ativa):** **`{dados_p['Densidade_Real_Calculada']:.2f} kg/m³`**
-            * **Temperatura dos Moldes:** {dados_p['Temp_Moldes_C']}
-            * **Setpoint dos Tanques:** {dados_p['Setpoint_Material_C']} °C
-            * **Teor de Ciclopentano (HC):** 9,71 % em peso
+            * **Agente expansor:** {REV.regime.nome} — {formatar(REV.regime.pct_pre_mistura * 100, 2)}% na pré-mistura
+            * **Relação i/p (iso / pré-mistura):** {formatar(REV.relacao_ip)} (mín. {formatar(REV.relacao_min)} — máx. {formatar(REV.relacao_max)})
+            * **Vazão:** {prm.get('Vazão', '—')}
+            * **Pressão de injeção:** {prm.get('Pressão de injeção', '—')}
+            * **Temperatura tanques / cabeçote:** {REV.temp_tanques} °C
+            * **Temperatura dos moldes / peças:** {prm.get('Temperatura dos moldes', '—')} / {prm.get('Temperatura das peças', '—')}
+            * **Creme / gel / pega livre:** {prm.get('Tempo de creme', '—')} / {prm.get('Tempo de gel', '—')} / {prm.get('Pega livre', '—')}
+            * **Densidade livre:** {prm.get('Densidade livre', '—')}
+            * **Densidade moldada do item:** {formatar(item.densidade_moldada, 2)} kg/m³ · volume {formatar(item.volume_m3, 6)} m³
+            * **Temperatura das estufas:** {prm.get('Temperatura das estufas', '—')}
+            * **Cura / desmolde:** {prm.get('Tempo de cura / desmolde', '—')}
+            * **Divisão da massa:** isocianato {formatar(REV.regime.pct_iso * 100, 2)}% · poliol {formatar(REV.regime.pct_poliol * 100, 2)}% · agente {formatar(REV.regime.pct_agente * 100, 2)}%
             """)
-
-        st.markdown("---")
-        st.subheader("🔬 Validação Estrutural (Resistência à Compressão NBR 8082)")
-        res1, res2 = st.columns(2)
-        res1.metric("Resistência Estimada", f"{dados_p['Resistencia_Compressao_Est_kPa']:.1f} kPa", "Mínimo regulamentar: 110 kPa")
-        if "APROVADO" in str(dados_p['Status_Estrutural']):
-            res2.success(f"Status Mecânico: {dados_p['Status_Estrutural']}")
-        else:
-            res2.error(f"Status Mecânico: {dados_p['Status_Estrutural']}")
+            st.caption(f"Resistência à compressão mínima: {prm.get('Resistência à compressão — mínimo', '110 kPa')}, "
+                       "verificada por ensaio de laboratório na densidade de núcleo.")
+            st.caption(f"Fonte: {REV.arquivo.name}")
 
     elif st.session_state["menu_ativo"] == "pesagem":
         st.subheader("⚖️ Controle de Pesagem em Campo")
@@ -781,7 +834,7 @@ else:
                 insp_qual_obs = st.text_area("Observações de Qualidade:", placeholder="Ex: Células fechadas, retrabalhos, aderência...")
                 
                 st.markdown("#### 🦺 Segurança Operacional & Meio Ambiente")
-                insp_seg_status = st.selectbox("Status EPIs, Ventilação e Ciclopentano (HC):", ["Conforme", "Advertência", "Paralisação Recomendada"], key="insp_seg_status_key")
+                insp_seg_status = st.selectbox("Status EPIs, Ventilação e Agente Expansor (HC):", ["Conforme", "Advertência", "Paralisação Recomendada"], key="insp_seg_status_key")
                 insp_seg_obs = st.text_area("Observações de Segurança:", placeholder="Ex: Exaustão ativa, detectores de gás, EPIs...")
 
             st.markdown("---")
@@ -960,15 +1013,12 @@ else:
         st.subheader("⚠️ Registro de Anomalias & Abertura de Ocorrência")
         st.markdown("Registre a não conformidade. Um número de ID (Pendência) será gerado automaticamente.")
         
-        agenda_emails = {
-            "Rogério Grahl (Engenheiro Consultor) — Rograhl75@gmail.com": "Rograhl75@gmail.com",
-            "Pedro Mantovani (Gerente Slitter) — pedro.mantovani@fastgondolas.com.br": "pedro.mantovani@fastgondolas.com.br",
-            "Israel Silva (Gerente Montagem) — israel.silva@ariamequipamentos.com.br": "israel.silva@ariamequipamentos.com.br",
-            "Roberto Silva (Supervisor Qualidade) — roberto.silva@fastgondolas.com.br": "roberto.silva@fastgondolas.com.br",
-            "André Caseiro (Engenharia Processos) — andre.caseiro@ariamequipamentos.com.br": "andre.caseiro@ariamequipamentos.com.br",
-            "Robson Milanez (Gerente Manutenção) — robson.milanez@fastgondolas.com.br": "robson.milanez@fastgondolas.com.br",
-            "Gledston Santana (Gerente Qualidade) — gledston.santana@fastgondolas.com.br": "gledston.santana@fastgondolas.com.br"
-        }
+        # Destinatários ficam em .streamlit/secrets.toml, bloco [anomalias.destinatarios]
+        # ("Nome (Cargo)" = "email"), nunca no código.
+        agenda_emails = dict(_secao_secrets("anomalias").get("destinatarios", {}))
+        if not agenda_emails:
+            st.warning("Nenhum destinatário configurado em [anomalias.destinatarios] no secrets.toml. "
+                       "Informe o e-mail manualmente.")
         
         with st.form("form_anomalia"):
             st.markdown("### 1️⃣ Dados da Ocorrência")
@@ -979,9 +1029,13 @@ else:
                 a_data = st.date_input("Data da Ocorrência", data_atual_br, key="anom_data")
                 a_maquina = st.selectbox("Injetora / Máquina Afetada", df_base['Maquina_Filtro'].unique().tolist(), key="anom_maquina_select")
             with col_a2:
-                resp_selecionado = st.selectbox("Direcionar para o Responsável:", list(agenda_emails.keys()), key="anom_resp_select")
-                a_email_destino = agenda_emails[resp_selecionado]
-                a_responsavel_cargo = resp_selecionado.split(" — ")[0]
+                if agenda_emails:
+                    resp_selecionado = st.selectbox("Direcionar para o Responsável:", list(agenda_emails.keys()), key="anom_resp_select")
+                    a_email_destino = agenda_emails[resp_selecionado]
+                    a_responsavel_cargo = resp_selecionado.split(" — ")[0]
+                else:
+                    a_responsavel_cargo = st.text_input("Responsável (nome e cargo):", key="anom_resp_nome")
+                    a_email_destino = st.text_input("E-mail do responsável:", key="anom_resp_email")
                 
             a_problema = st.text_area("Descrição do Problema Detectado (Ocorrência):", placeholder="Ex: Desvio de densidade acima do limite superior...")
             
@@ -1042,7 +1096,7 @@ else:
                     df_anom.to_excel(arq_anomalias, index=False)
                     
                     try:
-                        smtp_cfg = st.secrets.get("smtp", {})
+                        smtp_cfg = _secao_secrets("smtp")
                         smtp_server = smtp_cfg.get("host", "smtp.gmail.com")
                         smtp_port = int(smtp_cfg.get("port", 587))
                         remetente_email = smtp_cfg.get("username", "")
